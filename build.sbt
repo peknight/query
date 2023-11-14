@@ -30,5 +30,9 @@ lazy val queryCore = (crossProject(JSPlatform, JVMPlatform) in file("query-core"
   .settings(
     name := "query-core",
     libraryDependencies ++= Seq(
+      "com.peknight" %%% "codec-core" % pekCodecVersion,
     ),
   )
+
+val pekVersion = "0.1.0-SNAPSHOT"
+val pekCodecVersion = pekVersion
