@@ -2,9 +2,9 @@ package com.peknight.query
 
 import com.peknight.codec.cursor.Cursor
 import com.peknight.codec.error.DecodingFailure
-import com.peknight.codec.id.{Decoder, Encoder}
 
 package object codec:
-  type QueryEncoder[A] = Encoder[Query, A]
-  type QueryDecoder[A] = Decoder[Cursor[Query], DecodingFailure[Cursor[Query]], A]
+  type Codec[F[_], A] = com.peknight.codec.Codec[F, Query, Cursor[Query], DecodingFailure, A]
+  type Encoder[F[_], A] = com.peknight.codec.Encoder[F, Query, A]
+  type Decoder[F[_], A] = com.peknight.codec.Decoder[F, Cursor[Query], DecodingFailure, A]
 end codec
