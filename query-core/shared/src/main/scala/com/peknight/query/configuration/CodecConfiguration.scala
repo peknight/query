@@ -1,3 +1,0 @@
-package com.peknight.query.configuration
-
-trait CodecConfiguration extends EncoderConfiguration with DecoderConfiguration
