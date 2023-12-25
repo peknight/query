@@ -3,12 +3,13 @@ package com.peknight.query
 import cats.data.Chain
 import cats.{Foldable, Id}
 import com.peknight.codec.Object
-import com.peknight.query.configuration.Configuration
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
 import com.peknight.generic.migration.id.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
+import com.peknight.query.configuration.PathOp.PathString
+import com.peknight.query.configuration.{Configuration, PathOp}
 
 sealed trait Query derives CanEqual:
   def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[Query] => X)
@@ -94,26 +95,49 @@ sealed trait Query derives CanEqual:
             case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
           }
         })
-  def pairs(configuration: Configuration): Chain[(String, Option[String])] = flatten.map {
-    case (path, value) =>
-      val elems = path.value
-      if elems.isEmpty then ("", value)
-      else if elems.length == 1 then
-        elems.head match
-          case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
-          case ObjectKey(keyName) => (keyName, value)
-          case ArrayIndex(index) =>
-            configuration.lastArrayOp match
-              case Index => (s"$index", value)
-              case Brackets => ("[]", value)
-              case Empty => ("", value)
-      else if elems.length == 2 then
-        val head = elems.head
-        val last = elems.last
-        ???
-      else ???
-  }
-
+  def pairs(configuration: Configuration): Chain[(String, Option[String])] =
+    flatten.map {
+      case (path, value) =>
+        val elems = path.value
+        if elems.isEmpty then ("", value)
+        else if elems.length == 1 then
+          elems.head match
+            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
+            case ObjectKey(keyName) => (keyName, value)
+            case ArrayIndex(index) =>
+              configuration.lastArrayOp match
+                case Index => (s"$index", value)
+                case Brackets => ("[]", value)
+                case Empty => ("", value)
+        else
+          val head = elems.head match
+            case ObjectKey(keyName) => keyName
+            case ArrayIndex(index) => s"$index"
+          val last = elems.last match
+            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ""
+            case ObjectKey(keyName) =>
+              configuration.pathOp match
+                case PathOp.PathString => s".$keyName"
+                case PathOp.Brackets => s"[$keyName]"
+            case ArrayIndex(index) =>
+              configuration.lastArrayOp match
+                case Index => s"[$index]"
+                case Brackets => "[]"
+                case Empty => ""
+          if elems.length == 2 then
+            (s"$head$last", value)
+          else
+            val m = elems.tail.init
+            val key = m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
+              case (sb, ObjectKey(keyName)) =>
+                configuration.pathOp match
+                  case PathString => sb.append(".").append(keyName)
+                  case PathOp.Brackets => sb.append("[").append(keyName).append("]")
+              case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
+            }
+            .append(last).toString
+            (key, value)
+    }
 end Query
 object Query:
   case object QueryNull extends Query:
