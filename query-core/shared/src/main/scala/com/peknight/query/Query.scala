@@ -3,8 +3,12 @@ package com.peknight.query
 import cats.data.Chain
 import cats.{Foldable, Id}
 import com.peknight.codec.Object
+import com.peknight.query.configuration.Configuration
+import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
+import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
 import com.peknight.generic.migration.id.Isomorphism
+import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
 
 sealed trait Query derives CanEqual:
   def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[Query] => X)
@@ -74,24 +78,42 @@ sealed trait Query derives CanEqual:
     this match
       case Query.QueryObject(value) => Query.QueryObject(f(value))
       case _ => this
-  def flatten: Chain[(Chain[String | Int], Chain[String])] =
+  def flatten: Chain[(PathToRoot, Option[String])] =
     this match
-      case Query.QueryNull => Chain.one(Chain.empty[String | Int], Chain.empty[String])
-      case Query.QueryValue(value) => Chain.one(Chain.empty[String | Int], Chain.one(value))
-      case Query.QueryArray(value) if value.forall(_.isValue) =>
-        Chain.one(Chain.empty[String | Int], Chain.fromSeq(value.collect { case Query.QueryValue(value) => value }))
+      case Query.QueryNull => Chain.one(PathToRoot.empty, None)
+      case Query.QueryValue(value) => Chain.one(PathToRoot.empty, Some(value))
       case Query.QueryArray(value) =>
-        Foldable[Vector].fold[Chain[(Chain[String | Int], Chain[String])]](value.zipWithIndex.map {
+        Foldable[Vector].fold[Chain[(PathToRoot, Option[String])]](value.zipWithIndex.map {
           case (query, index) => query.flatten.map {
-            case (keyChain, valueChain) => (index +: keyChain, valueChain)
+            case (pathToRoot, value) => (ArrayIndex(index) +: pathToRoot, value)
           }
         })
       case Query.QueryObject(value) =>
-        Foldable[Vector].fold[Chain[(Chain[String | Int], Chain[String])]](value.toVector.map {
+        Foldable[Vector].fold[Chain[(PathToRoot, Option[String])]](value.toVector.map {
           case (key, query) => query.flatten.map {
-            case (keyChain, valueChain) => (key +: keyChain, valueChain)
+            case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
           }
         })
+  def pairs(configuration: Configuration): Chain[(String, Option[String])] = flatten.map {
+    case (path, value) =>
+      val elems = path.value
+      if elems.isEmpty then ("", value)
+      else if elems.length == 1 then
+        elems.head match
+          case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
+          case ObjectKey(keyName) => (keyName, value)
+          case ArrayIndex(index) =>
+            configuration.lastArrayOp match
+              case Index => (s"$index", value)
+              case Brackets => ("[]", value)
+              case Empty => ("", value)
+      else if elems.length == 2 then
+        val head = elems.head
+        val last = elems.last
+        ???
+      else ???
+  }
+
 end Query
 object Query:
   case object QueryNull extends Query:
