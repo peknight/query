@@ -1,5 +1,5 @@
 package com.peknight.query.configuration
 
 enum ArrayOp derives CanEqual:
-  case Index, Brackets, Empty
+  case Brackets, Index, Empty
 end ArrayOp
