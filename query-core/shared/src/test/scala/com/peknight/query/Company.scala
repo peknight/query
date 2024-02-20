@@ -1,3 +1,3 @@
 package com.peknight.query
 
-case class Company(name: String, departments: List[Department])
+case class Company(name: String, departments: List[Department]) derives CanEqual
