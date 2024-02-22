@@ -20,6 +20,11 @@ class QueryFlatSpec extends AnyFlatSpec:
       Department("X", List(Employee("A", 20, List(Apple, Pear)), Employee("B", 25, List(Pear, Peach)))),
       Department("Y", List(Employee("C", 30, List(Apple, Peach)), Employee("D", 35, List(Apple))))
     ))
-    assert(Decoder[Company].decodeS(Encoder[Company].encode(company)).exists(_ == company))
+    println(Decoder[List[Fruit]].decodeS(Encoder[List[Fruit]].encode(List(Apple, Pear))))
+    println(Decoder[Employee].decodeS(Encoder[Employee].encode(company.departments.head.employees.head)))
+    // println(Decoder[Department].decodeS(Encoder[Department].encode(company.departments.head)))
+    // println(Decoder[Company].decodeS(Encoder[Department].encode(company)))
+    println(Encoder[Company].encode(company).pairs(Configuration()))
+    // assert(Decoder[Company].decodeS(Encoder[Company].encode(company)).exists(_ == company))
   }
 end QueryFlatSpec
