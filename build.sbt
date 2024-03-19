@@ -1,6 +1,6 @@
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
-ThisBuild / scalaVersion := "3.3.1"
+ThisBuild / scalaVersion := "3.3.3"
 
 ThisBuild / organization := "com.peknight"
 
@@ -11,7 +11,8 @@ lazy val commonSettings = Seq(
     "-unchecked",
     "-Xfatal-warnings",
     "-language:strictEquality",
-    "-Xmax-inlines:64"
+    "-Xmax-inlines:64",
+    "-Ximplicit-search-limit:500000"
   ),
 )
 
