@@ -6,9 +6,9 @@ import com.peknight.codec.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
+import com.peknight.commons.string.escape
 import com.peknight.generic.migration.id.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
-import com.peknight.query.configuration.PathOp.PathString
 import com.peknight.query.configuration.{Configuration, PathOp}
 
 sealed trait Query derives CanEqual:
@@ -97,8 +97,12 @@ sealed trait Query derives CanEqual:
         })
   def pairs(configuration: Configuration): Chain[(String, Option[String])] =
     flatten.map {
-      case (path, value) =>
-        val elems = path.value
+      case (path, v) =>
+        val value = v.map(configuration.escape)
+        val elems = path.value.map {
+          case ObjectKey(keyName) => ObjectKey(configuration.escape(keyName))
+          case e => e
+        }
         if elems.isEmpty then ("", value)
         else if elems.length == 1 then
           elems.head match
@@ -131,7 +135,7 @@ sealed trait Query derives CanEqual:
             val key = m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
               case (sb, ObjectKey(keyName)) =>
                 configuration.pathOp match
-                  case PathString => sb.append(".").append(keyName)
+                  case PathOp.PathString => sb.append(".").append(keyName)
                   case PathOp.Brackets => sb.append("[").append(keyName).append("]")
               case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
             }
