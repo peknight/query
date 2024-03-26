@@ -6,10 +6,12 @@ import com.peknight.codec.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
-import com.peknight.commons.string.escape
 import com.peknight.generic.migration.id.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
 import com.peknight.query.configuration.{Configuration, PathOp}
+
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets.UTF_8
 
 sealed trait Query derives CanEqual:
   def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[Query] => X)
@@ -97,12 +99,8 @@ sealed trait Query derives CanEqual:
         })
   def pairs(configuration: Configuration): Chain[(String, Option[String])] =
     flatten.map {
-      case (path, v) =>
-        val value = v.map(configuration.escape)
-        val elems = path.value.map {
-          case ObjectKey(keyName) => ObjectKey(configuration.escape(keyName))
-          case e => e
-        }
+      case (path, value) =>
+        val elems = path.value
         if elems.isEmpty then ("", value)
         else if elems.length == 1 then
           elems.head match
@@ -142,6 +140,12 @@ sealed trait Query derives CanEqual:
             .append(last).toString
             (key, value)
     }
+  def mkString(configuration: Configuration = Configuration.default): String = pairs(configuration).map {
+    case (key, valueOpt) =>
+      val keyStr = URLEncoder.encode(key, UTF_8)
+      val valueStr = valueOpt.fold("")(URLEncoder.encode(_, UTF_8))
+      if keyStr.isEmpty then valueStr else s"$keyStr=$valueStr"
+  }.filter(_.nonEmpty).toList.mkString("&")
 end Query
 object Query:
   case object QueryNull extends Query:
