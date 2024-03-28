@@ -10,8 +10,8 @@ class QueryParserFlatSpec extends AnyFlatSpec:
   "Query Parser" should "succeed with ice cream" in {
     val iceCream = IceCream("r&u=a+", 7, true)
     val tuple: (String, Int, Boolean) = Tuple.fromProductTyped(iceCream)
-    assert(parse[Id, IceCream](Encoder[IceCream].encode(iceCream).mkString()).exists(_ == iceCream))
-    assert(parse[Id, (String, Int, Boolean)](Encoder[(String, Int, Boolean)].encode(tuple).mkString()).exists(_ == tuple))
+    assert(parse[Id, IceCream](Encoder[IceCream].encode(iceCream).mkString).exists(_ == iceCream))
+    assert(parse[Id, (String, Int, Boolean)](Encoder[(String, Int, Boolean)].encode(tuple).mkString).exists(_ == tuple))
   }
 
   "Query Parser" should "succeed with company" in {
@@ -37,6 +37,6 @@ class QueryParserFlatSpec extends AnyFlatSpec:
     //   Department("X", List(Employee("A", 20, List(Apple, Pear)), Employee("B", 25, List(Pear, Peach)))),
     //   Department("Y", List(Employee("C", 30, List(Apple, Peach)), Employee("D", 35, List(Apple))))
     // ))
-    // assert(parse[Id, Company](Encoder[Company].encode(company).mkString()).exists(_ == company))
+    // assert(parse[Id, Company](Encoder[Company].encode(company).mkString).exists(_ == company))
   }
 end QueryParserFlatSpec

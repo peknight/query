@@ -97,7 +97,7 @@ sealed trait Query derives CanEqual:
             case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
           }
         })
-  def pairs(configuration: Configuration): Chain[(String, Option[String])] =
+  def pairs(using configuration: Configuration): Chain[(String, Option[String])] =
     flatten.map {
       case (path, value) =>
         val elems = path.value
@@ -140,7 +140,7 @@ sealed trait Query derives CanEqual:
             .append(last).toString
             (key, value)
     }
-  def mkString(configuration: Configuration = Configuration.default): String = pairs(configuration).map {
+  def mkString(using Configuration): String = pairs.map {
     case (key, valueOpt) =>
       val keyStr = URLEncoder.encode(key, UTF_8)
       val valueStr = valueOpt.fold("")(URLEncoder.encode(_, UTF_8))
