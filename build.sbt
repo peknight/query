@@ -62,7 +62,7 @@ lazy val queryHttp4s = (project in file("query-http4s"))
   )
 
 lazy val queryHttp4sCore = (crossProject(JSPlatform, JVMPlatform) in file("query-http4s/core"))
-  .dependsOn(queryCore)
+  .dependsOn(queryParser)
   .settings(commonSettings)
   .settings(
     name := "query-http4s-core",

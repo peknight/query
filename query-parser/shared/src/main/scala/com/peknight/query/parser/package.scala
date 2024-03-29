@@ -1,13 +1,14 @@
 package com.peknight.query
 
-import cats.Monad
 import cats.data.{Chain, EitherT, Validated}
 import cats.parse.Numbers.nonNegativeIntString
 import cats.parse.{Parser, Parser0}
 import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import cats.{Foldable, Monad}
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.{PathElem, PathToRoot}
 import com.peknight.error.Error
@@ -20,25 +21,37 @@ import scala.collection.immutable.ListMap
 
 package object parser:
   def parseKeys(map: Map[String, Chain[String]]): Validated[ParsingFailure, Map[PathToRoot, String]] =
+    doParseKeys(map)(_.uncons)(_.nonEmpty)(_.zipWithIndex)
+
+  def parseKeysWithSeq(map: Map[String, Seq[String]]): Validated[ParsingFailure, Map[PathToRoot, String]] =
+    doParseKeys(map)(seq => seq.headOption.map(head => (head, seq.tail)))(_.nonEmpty)(_.zipWithIndex)
+
+  def doParseKeys[F[_]](map: Map[String, F[String]])
+                       (uncons: F[String] => Option[(String, F[String])])
+                       (nonEmpty: F[String] => Boolean)
+                       (zipWithIndex: F[String] => F[(String, Int)])
+                       (using Foldable[F], cats.Applicative[F])
+  : Validated[ParsingFailure, Map[PathToRoot, String]] =
     map.toList
       .traverse {
-        case (key, values) => keyParser.parseAll(key).left.map(ParsingFailure.apply).toValidated.map {
-          case (init, arrayFlagOption) => (init, arrayFlagOption, values)
+        case (key, v) => keyParser.parseAll(key).left.map(ParsingFailure.apply).toValidated.map {
+          case (init, arrayFlagOption) => (init, arrayFlagOption, v)
         }
       }
       .map {
         _.foldLeft[Map[PathToRoot, String]](ListMap.empty[PathToRoot, String]) {
           case (acc, (init, arrayFlagOption, values)) =>
-            values.uncons match
+            uncons(values) match
               case None => acc
               case Some((head, tail)) =>
-                if arrayFlagOption.isDefined || tail.nonEmpty then
-                  values.zipWithIndex.foldLeft(acc) {
+                if arrayFlagOption.isDefined || nonEmpty(tail) then
+                  zipWithIndex(values).foldLeft(acc) {
                     case (map, (value, index)) => map + ((init :+ ArrayIndex(index)) -> value)
                   }
                 else acc + (init -> head)
         }
       }
+
 
   def parseQuery(map: Map[PathToRoot, String]): Either[ParsingFailure, Query] =
     if map.nonEmpty then
@@ -81,12 +94,21 @@ package object parser:
     else Query.Null.asRight
 
   def parse[F[_], A](input: String)(using monad: Monad[F], decoder: Decoder[F, A]): F[Either[Error, A]] =
-    EitherT[F, Error, Query](pairsParser.parseAll(input)
-      .left.map(ParsingFailure.apply)
-      .flatMap(map => parseKeys(map).toEither)
-      .flatMap(map => parseQuery(map))
-      .pure[F]
-    ).flatMap(query => EitherT[F, Error, A](decoder.decodeS(query).asInstanceOf[F[Either[Error, A]]])).value
+    EitherT(pairsParser.parseAll(input).left.map(error => ParsingFailure(error).asInstanceOf[Error]).pure[F])
+      .flatMap(params => EitherT(parse(params)))
+      .value
+
+  def parse[F[_], A](params: Map[String, Chain[String]])(using monad: Monad[F], decoder: Decoder[F, A])
+  : F[Either[Error, A]] =
+    EitherT(parseKeys(params).toEither.flatMap(parseQuery).pure[F])
+      .flatMap(query => EitherT(decoder.decodeS(query).asInstanceOf[F[Either[Error, A]]]))
+      .value
+
+  def parseWithSeq[F[_], A](params: Map[String, Seq[String]])(using monad: Monad[F], decoder: Decoder[F, A])
+  : F[Either[Error, A]] =
+    EitherT(parseKeysWithSeq(params).toEither.flatMap(parseQuery).pure[F])
+      .flatMap(query => EitherT(decoder.decodeS(query).asInstanceOf[F[Either[Error, A]]]))
+      .value
 
   private[this] val stringParser: Parser[String] =
     Parser.charsWhile(ch => !"&=".contains(ch)).map(URLDecoder.decode(_, UTF_8))

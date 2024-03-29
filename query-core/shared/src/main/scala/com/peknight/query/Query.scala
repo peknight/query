@@ -12,6 +12,7 @@ import com.peknight.query.configuration.{Configuration, PathOp}
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets.UTF_8
+import scala.collection.immutable.ListMap
 
 sealed trait Query derives CanEqual:
   def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[Query] => X)
@@ -140,6 +141,14 @@ sealed trait Query derives CanEqual:
             .append(last).toString
             (key, value)
     }
+
+  def toMap(using configuration: Configuration): Map[String, Chain[String]] =
+    pairs.foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) => 
+      val nextValues = acc.get(key).map(values => valueOption.fold(values)(value => values :+ value))
+        .getOrElse(valueOption.fold(Chain.empty[String])(Chain.one))
+      acc + (key -> nextValues)
+    }
+
   def mkString(using Configuration): String = pairs.map {
     case (key, valueOpt) =>
       val keyStr = URLEncoder.encode(key, UTF_8)
