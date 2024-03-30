@@ -20,9 +20,8 @@ lazy val query = (project in file("."))
   .aggregate(
     queryCore.jvm,
     queryCore.js,
-    queryParser.jvm,
-    queryParser.js,
-    queryHttp4s,
+    queryHttp4s.jvm,
+    queryHttp4s.js,
   )
   .settings(commonSettings)
   .settings(
@@ -34,35 +33,15 @@ lazy val queryCore = (crossProject(JSPlatform, JVMPlatform) in file("query-core"
   .settings(
     name := "query-core",
     libraryDependencies ++= Seq(
+      "org.typelevel" %%% "cats-parse" % catsParseVersion,
       "com.peknight" %%% "codec-core" % pekCodecVersion,
       "com.peknight" %%% "commons-string" % pekCommonsVersion,
       "org.scalatest" %%% "scalatest" % scalaTestVersion % Test,
     ),
   )
 
-lazy val queryParser = (crossProject(JSPlatform, JVMPlatform) in file("query-parser"))
+lazy val queryHttp4s = (crossProject(JSPlatform, JVMPlatform) in file("query-http4s"))
   .dependsOn(queryCore)
-  .settings(commonSettings)
-  .settings(
-    name := "query-parser",
-    libraryDependencies ++= Seq(
-      "org.typelevel" %%% "cats-parse" % catsParseVersion,
-      "org.scalatest" %%% "scalatest" % scalaTestVersion % Test,
-    ),
-  )
-
-lazy val queryHttp4s = (project in file("query-http4s"))
-  .aggregate(
-    queryHttp4sCore.jvm,
-    queryHttp4sCore.js,
-  )
-  .settings(commonSettings)
-  .settings(
-    name := "query-http4s",
-  )
-
-lazy val queryHttp4sCore = (crossProject(JSPlatform, JVMPlatform) in file("query-http4s/core"))
-  .dependsOn(queryParser)
   .settings(commonSettings)
   .settings(
     name := "query-http4s-core",

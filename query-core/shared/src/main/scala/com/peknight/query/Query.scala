@@ -1,14 +1,19 @@
 package com.peknight.query
 
 import cats.data.Chain
-import cats.{Foldable, Id}
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
+import cats.{Foldable, Id, Monoid}
 import com.peknight.codec.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
+import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.id.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
 import com.peknight.query.configuration.{Configuration, PathOp}
+import com.peknight.query.error.RootTypeNotMatch
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets.UTF_8
@@ -98,63 +103,11 @@ sealed trait Query derives CanEqual:
             case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
           }
         })
-  def pairs(using configuration: Configuration): Chain[(String, Option[String])] =
-    flatten.map {
-      case (path, value) =>
-        val elems = path.value
-        if elems.isEmpty then ("", value)
-        else if elems.length == 1 then
-          elems.head match
-            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
-            case ObjectKey(keyName) => (keyName, value)
-            case ArrayIndex(index) =>
-              configuration.lastArrayOp match
-                case Index => (s"$index", value)
-                case Brackets => ("[]", value)
-                case Empty => ("", value)
-        else
-          val head = elems.head match
-            case ObjectKey(keyName) => keyName
-            case ArrayIndex(index) => s"$index"
-          val last = elems.last match
-            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ""
-            case ObjectKey(keyName) =>
-              configuration.pathOp match
-                case PathOp.PathString => s".$keyName"
-                case PathOp.Brackets => s"[$keyName]"
-            case ArrayIndex(index) =>
-              configuration.lastArrayOp match
-                case Index => s"[$index]"
-                case Brackets => "[]"
-                case Empty => ""
-          if elems.length == 2 then
-            (s"$head$last", value)
-          else
-            val m = elems.tail.init
-            val key = m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
-              case (sb, ObjectKey(keyName)) =>
-                configuration.pathOp match
-                  case PathOp.PathString => sb.append(".").append(keyName)
-                  case PathOp.Brackets => sb.append("[").append(keyName).append("]")
-              case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
-            }
-            .append(last).toString
-            (key, value)
-    }
+  def pairs(using configuration: Configuration): Chain[(String, Option[String])] = Query.pairs(flatten)
 
-  def toMap(using configuration: Configuration): Map[String, Chain[String]] =
-    pairs.foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) => 
-      val nextValues = acc.get(key).map(values => valueOption.fold(values)(value => values :+ value))
-        .getOrElse(valueOption.fold(Chain.empty[String])(Chain.one))
-      acc + (key -> nextValues)
-    }
+  def toMap(using configuration: Configuration): Map[String, Chain[String]] = Query.toMap(pairs)
 
-  def mkString(using Configuration): String = pairs.map {
-    case (key, valueOpt) =>
-      val keyStr = URLEncoder.encode(key, UTF_8)
-      val valueStr = valueOpt.fold("")(URLEncoder.encode(_, UTF_8))
-      if keyStr.isEmpty then valueStr else s"$keyStr=$valueStr"
-  }.filter(_.nonEmpty).toList.mkString("&")
+  def mkString(using Configuration): String = Query.mkString(pairs)
 end Query
 object Query:
   case object QueryNull extends Query:
@@ -187,11 +140,131 @@ object Query:
   def arr(values: Query*): Query = fromValues(values)
   def fromFields(fields: Iterable[(String, Query)]): Query = QueryObject(Object.fromIterable(fields))
   def fromValues(values: Iterable[Query]): Query = QueryArray(values.toVector)
+  def fromValues(values: Query*): Query = QueryArray(values.toVector)
   def fromObject(value: Object[Query]): Query = QueryObject(value)
   def fromString(value: String): Query = QueryValue(value)
+
+  given Monoid[Query] with
+    def empty: Query = Null
+    def combine(x: Query, y: Query): Query =
+      (x, y) match
+        case (QueryNull, b) => b
+        case (a, QueryNull) => a
+        case (a@QueryValue(_), b@QueryValue(_)) => fromValues(a, b)
+        case (a@QueryValue(_), QueryArray(bs)) => fromValues(a +: bs)
+        case (QueryValue(a), QueryObject(bs)) => fromObject(bs.add(a, Null))
+        case (QueryArray(as), b@QueryValue(_)) => fromValues(as :+ b)
+        case (QueryArray(as), QueryArray(bs)) => fromValues(as ++ bs)
+        case (QueryArray(as), QueryObject(bs)) =>
+          fromObject(Object.fromIterable(as.zipWithIndex.map(tuple => (s"${tuple._2}", tuple._1))).deepMerge(bs))
+        case (QueryObject(as), QueryValue(b)) => fromObject(as.add(b, Null))
+        case (QueryObject(as), QueryArray(bs)) =>
+          fromObject(as.deepMerge(Object.fromIterable(bs.zipWithIndex.map(tuple => (s"${tuple._2}", tuple._1)))))
+        case (QueryObject(as), QueryObject(bs)) => fromObject(as.deepMerge(bs))
+  end given
 
   given ArrayType[Query] = ArrayType[Query](Query.fromValues, _.asArray)
   given NullType[Query] = NullType[Query](Query.Null, _.asNull)
   given StringType[Query] = StringType[Query](Query.fromString, _.asValue)
   given ObjectType[Query] = ObjectType[Query](Query.fromObject, _.asObject)
+
+  def pairs(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
+  : Chain[(String, Option[String])] =
+    chain.map {
+      case (path, value) =>
+        val elems = path.value
+        if elems.isEmpty then ("", value)
+        else if elems.length == 1 then
+          elems.head match
+            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
+            case ObjectKey(keyName) => (keyName, value)
+            case ArrayIndex(index) =>
+              configuration.lastArrayOp match
+                case Index => (s"$index", value)
+                case Brackets => ("[]", value)
+                case Empty => ("", value)
+        else
+          val head = elems.head match
+            case ObjectKey(keyName) => keyName
+            case ArrayIndex(index) => s"$index"
+          val last = elems.last match
+            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ""
+            case ObjectKey(keyName) =>
+              configuration.pathOp match
+                case PathOp.PathString => s".$keyName"
+                case PathOp.Brackets => s"[$keyName]"
+            case ArrayIndex(index) =>
+              configuration.lastArrayOp match
+                case Index => s"[$index]"
+                case Brackets => "[]"
+                case Empty => ""
+          if elems.length == 2 then
+            (s"$head$last", value)
+          else
+            val m = elems.tail.init
+            val key = m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
+                case (sb, ObjectKey(keyName)) =>
+                  configuration.pathOp match
+                    case PathOp.PathString => sb.append(".").append(keyName)
+                    case PathOp.Brackets => sb.append("[").append(keyName).append("]")
+                case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
+              }
+              .append(last).toString
+            (key, value)
+    }
+
+  def toMap(chain: Chain[(String, Option[String])]): Map[String, Chain[String]] =
+    chain.foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) =>
+      val nextValues = acc.get(key).map(values => valueOption.fold(values)(value => values :+ value))
+        .getOrElse(valueOption.fold(Chain.empty[String])(Chain.one))
+      acc + (key -> nextValues)
+    }
+
+  def mkString(chain: Chain[(String, Option[String])]): String =
+    chain.collect {
+      case (key, Some(value)) =>
+        val keyStr = URLEncoder.encode(key, UTF_8)
+        val valueStr = URLEncoder.encode(value, UTF_8)
+        if keyStr.isEmpty then valueStr else s"$keyStr=$valueStr"
+    }.filter(_.nonEmpty).toList.mkString("&")
+
+  def parseMap(map: Map[PathToRoot, String]): Either[ParsingFailure, Query] =
+    if map.nonEmpty then
+      val (objectMap, arrayMap, rootOption) = map.foldRight((ListMap.empty[String, ListMap[PathToRoot, String]],
+        ListMap.empty[Int, ListMap[PathToRoot, String]], none[String])) {
+        case ((pathToRoot, value), (objMap, arrMap, rootOpt)) =>
+          pathToRoot.value.headOption match
+            case Some(ObjectKey(keyName)) =>
+              val acc = objMap.getOrElse(keyName, ListMap.empty[PathToRoot, String]) +
+                (PathToRoot(pathToRoot.value.tail) -> value)
+              (objMap + (keyName -> acc), arrMap, rootOpt)
+            case Some(ArrayIndex(index)) =>
+              val acc = arrMap.getOrElse(index.toInt, ListMap.empty[PathToRoot, String]) +
+                (PathToRoot(pathToRoot.value.tail) -> value)
+              (objMap, arrMap + (index.toInt -> acc), rootOpt)
+            case None => (objMap, arrMap, value.some)
+      }
+      if objectMap.isEmpty && arrayMap.isEmpty && rootOption.isEmpty then
+        Null.asRight
+      else if arrayMap.isEmpty && rootOption.isEmpty then
+        objectMap.toList
+          .traverse { case (keyName, subMap) =>
+            parseMap(subMap).left.map(_.prependLabel(keyName)).toValidated.map(query => (keyName, query))
+          }
+          .map(fromFields)
+          .toEither
+      else if objectMap.isEmpty && rootOption.isEmpty then
+        val maxIndex = arrayMap.keys.max
+        val acc = for i <- 0 to maxIndex yield (i, arrayMap.get(i))
+        acc.toVector
+          .traverse { case (index, subMapOption) =>
+            subMapOption.fold(Null.asRight)(subMap => parseMap(subMap).left.map(_.prependLabel(s"$index")))
+              .toValidated
+          }
+          .map(fromValues).toEither
+      else if objectMap.isEmpty && arrayMap.isEmpty then
+        rootOption.fold(Null)(fromString).asRight
+      else
+        RootTypeNotMatch.value(map).asLeft
+    else Null.asRight
 end Query
