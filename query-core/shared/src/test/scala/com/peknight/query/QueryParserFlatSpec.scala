@@ -1,7 +1,6 @@
 package com.peknight.query
 
 import com.peknight.codec.configuration.given
-import com.peknight.query.codec.id.Encoder
 import com.peknight.query.configuration.given
 import com.peknight.query.parser.id.parse
 import com.peknight.query.syntax.id.query.toQueryString
@@ -17,28 +16,20 @@ class QueryParserFlatSpec extends AnyFlatSpec:
   }
 
   "Query Parser" should "succeed with company" in {
-    // import cats.Id
-    // import com.peknight.codec.cursor.Cursor
-    // import com.peknight.codec.error.DecodingFailure
-    // import com.peknight.query.Fruit.{Apple, Peach, Pear}
-    // given fruitDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, Fruit] =
-    //   com.peknight.codec.Decoder.derived[Id, Query, Cursor[Query], DecodingFailure, Fruit]
-    // given fruitsDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, List[Fruit]] =
-    //   com.peknight.codec.Decoder.decodeList[Id, Query, Fruit]
-    // given employeeDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, Employee] =
-    //   com.peknight.codec.Decoder.derived[Id, Query, Cursor[Query], DecodingFailure, Employee]
-    // given employeesDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, List[Employee]] =
-    //   com.peknight.codec.Decoder.decodeList[Id, Query, Employee]
-    // given departmentDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, Department] =
-    //   com.peknight.codec.Decoder.derived[Id, Query, Cursor[Query], DecodingFailure, Department]
-    // given departmentsDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, List[Department]] =
-    //   com.peknight.codec.Decoder.decodeList[Id, Query, Department]
-    // given companyDecoder: com.peknight.codec.Decoder[Id, Cursor[Query], DecodingFailure, Company] =
-    //   com.peknight.codec.Decoder.derived[Id, Query, Cursor[Query], DecodingFailure, Company]
-    // val company = Company("Pek", List(
-    //   Department("X", List(Employee("A", 20, List(Apple, Pear)), Employee("B", 25, List(Pear, Peach)))),
-    //   Department("Y", List(Employee("C", 30, List(Apple, Peach)), Employee("D", 35, List(Apple))))
-    // ))
-    // assert(parse[Company](company.toQueryString).exists(_ == company))
+    import cats.Id
+    import com.peknight.codec.Decoder.{decodeList, derived}
+    import com.peknight.codec.cursor.id.Decoder
+    given fruitDecoder: Decoder[Query, Fruit] = derived[Id, Query, Fruit]
+    given fruitsDecoder: Decoder[Query, List[Fruit]] = decodeList[Id, Query, Fruit]
+    given employeeDecoder: Decoder[Query, Employee] = derived[Id, Query, Employee]
+    given employeesDecoder: Decoder[Query, List[Employee]] = decodeList[Id, Query, Employee]
+    given departmentDecoder: Decoder[Query, Department] = derived[Id, Query, Department]
+    given departmentsDecoder: Decoder[Query, List[Department]] = decodeList[Id, Query, Department]
+    given companyDecoder: Decoder[Query, Company] = derived[Id, Query, Company]
+    val company = Company("Pek", List(
+      Department("X", List(Employee("A", 20, List(Fruit.Apple, Fruit.Pear)), Employee("B", 25, List(Fruit.Peach)))),
+      Department("Y", List(Employee("C", 30, List(Fruit.Apple, Fruit.Peach)), Employee("D", 35, List(Fruit.Pear))))
+    ))
+    assert(parse[Company](company.toQueryString).exists(_ == company))
   }
 end QueryParserFlatSpec
