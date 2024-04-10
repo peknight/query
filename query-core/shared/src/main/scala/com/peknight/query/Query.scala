@@ -5,7 +5,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import cats.{Foldable, Id, Monoid}
-import com.peknight.codec.Object
+import com.peknight.codec.obj.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
