@@ -1,16 +1,17 @@
 package com.peknight.query
 
 import cats.data.Chain
+import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import cats.{Foldable, Id, Monoid}
+import cats.{Applicative, Foldable, Monoid}
 import com.peknight.codec.obj.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
 import com.peknight.error.parse.ParsingFailure
-import com.peknight.generic.migration.id.Isomorphism
+import com.peknight.generic.migration.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
 import com.peknight.query.configuration.{Configuration, PathOp}
 import com.peknight.query.error.RootTypeNotMatch
@@ -111,28 +112,29 @@ sealed trait Query derives CanEqual:
 end Query
 object Query:
   case object QueryNull extends Query:
-    given Isomorphism[QueryNull.type, Unit] with
-      def to(a: QueryNull.type): Id[Unit] = ()
-      def from(b: Unit): Id[QueryNull.type] = QueryNull
+
+    given [F[_]: Applicative]: Isomorphism[F, QueryNull.type, Unit] with
+      def to(a: QueryNull.type): F[Unit] = ().pure
+      def from(b: Unit): F[QueryNull.type] = QueryNull.pure
   end QueryNull
   case class QueryValue(value: String) extends Query
   object QueryValue:
-    given Isomorphism[QueryValue, String] with
-      def to(a: QueryValue): Id[String] = a.value
-      def from(b: String): Id[QueryValue] = QueryValue(b)
+    given [F[_]: Applicative]: Isomorphism[F, QueryValue, String] with
+      def to(a: QueryValue): F[String] = a.value.pure
+      def from(b: String): F[QueryValue] = QueryValue(b).pure
     end given
   end QueryValue
   case class QueryArray(value: Vector[Query]) extends Query
   object QueryArray:
-    given Isomorphism[QueryArray, Vector[Query]] with
-      def to(a: QueryArray): Id[Vector[Query]] = a.value
-      def from(b: Vector[Query]): Id[QueryArray] = QueryArray(b)
+    given [F[_]: Applicative]: Isomorphism[F, QueryArray, Vector[Query]] with
+      def to(a: QueryArray): F[Vector[Query]] = a.value.pure
+      def from(b: Vector[Query]): F[QueryArray] = QueryArray(b).pure
   end QueryArray
   case class QueryObject(value: Object[Query]) extends Query
   object QueryObject:
-    given Isomorphism[QueryObject, Object[Query]] with
-      def to(a: QueryObject): Id[Object[Query]] = a.value
-      def from(b: Object[Query]): Id[QueryObject] = QueryObject(b)
+    given [F[_]: Applicative]: Isomorphism[F, QueryObject, Object[Query]] with
+      def to(a: QueryObject): F[Object[Query]] = a.value.pure
+      def from(b: Object[Query]): F[QueryObject] = QueryObject(b).pure
   end QueryObject
 
   val Null: Query = QueryNull
