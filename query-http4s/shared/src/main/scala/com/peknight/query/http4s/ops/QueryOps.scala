@@ -17,5 +17,5 @@ object QueryOps:
     parseWithSeq[F, A](query.multiParams)
 
   def withQueryParams[F[_], A](query: Query, a: A)(using Functor[F], Encoder[F, A], Configuration): F[Query] =
-    a.pairs[F].map(p => query ++ p.toVector)
+    a.pairs[F].map(p => query ++ p.filter(_._2.isDefined).toVector)
 end QueryOps

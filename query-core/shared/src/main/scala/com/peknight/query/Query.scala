@@ -216,7 +216,7 @@ object Query:
     }
 
   def toMap(chain: Chain[(String, Option[String])]): Map[String, Chain[String]] =
-    chain.foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) =>
+    chain.filter(_._2.isDefined).foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) =>
       val nextValues = acc.get(key).map(values => valueOption.fold(values)(value => values :+ value))
         .getOrElse(valueOption.fold(Chain.empty[String])(Chain.one))
       acc + (key -> nextValues)
