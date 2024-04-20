@@ -178,7 +178,7 @@ object Query:
         if elems.isEmpty then ("", value)
         else if elems.length == 1 then
           elems.head match
-            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ("", value)
+            case ObjectKey(keyName) if configuration.defaultKeys.contains(keyName) => ("", value)
             case ObjectKey(keyName) => (keyName, value)
             case ArrayIndex(index) =>
               configuration.lastArrayOp match
@@ -190,7 +190,7 @@ object Query:
             case ObjectKey(keyName) => keyName
             case ArrayIndex(index) => s"$index"
           val last = elems.last match
-            case ObjectKey(keyName) if configuration.defaultKey.contains(keyName) => ""
+            case ObjectKey(keyName) if configuration.defaultKeys.contains(keyName) => ""
             case ObjectKey(keyName) =>
               configuration.pathOp match
                 case PathOp.PathString => s".$keyName"
