@@ -44,7 +44,7 @@ lazy val queryHttp4s = (crossProject(JSPlatform, JVMPlatform) in file("query-htt
   .dependsOn(queryCore)
   .settings(commonSettings)
   .settings(
-    name := "query-http4s-core",
+    name := "query-http4s",
     libraryDependencies ++= Seq(
       "org.http4s" %%% "http4s-core" % http4sVersion,
       "org.scalatest" %%% "scalatest" % scalaTestVersion % Test,
