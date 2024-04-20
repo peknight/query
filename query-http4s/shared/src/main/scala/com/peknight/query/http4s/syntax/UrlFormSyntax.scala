@@ -14,7 +14,7 @@ trait UrlFormSyntax:
 
   extension (urlForm: UrlForm)
     def parse[F[_], A](using Monad[F], Decoder[F, A]): F[Either[Error, A]] = UrlFormOps.parseUrlForm[F, A](urlForm)
-    def withQueryParams[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[UrlForm] =
+    def withQuery[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[UrlForm] =
       UrlFormOps.withQueryParams[F, A](urlForm, a)
   end extension
 end UrlFormSyntax

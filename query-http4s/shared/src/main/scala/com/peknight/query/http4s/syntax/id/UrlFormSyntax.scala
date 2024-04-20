@@ -14,7 +14,7 @@ trait UrlFormSyntax:
 
   extension (urlForm: UrlForm)
     def parse[A](using Decoder[A]): Either[Error, A] = UrlFormOps.parseUrlForm[Id, A](urlForm)
-    def withQueryParams[A](a: A)(using Encoder[A], Configuration): UrlForm =
+    def withQuery[A](a: A)(using Encoder[A], Configuration): UrlForm =
       UrlFormOps.withQueryParams[Id, A](urlForm, a)
   end extension
 end UrlFormSyntax

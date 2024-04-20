@@ -14,7 +14,7 @@ trait QuerySyntax:
 
   extension (query: Query)
     def parse[A](using Decoder[A]): Either[Error, A] = QueryOps.parseQuery[Id, A](query)
-    def withQueryParams[A](a: A)(using Encoder[A], Configuration): Query = QueryOps.withQueryParams[Id, A](query, a)
+    def withQuery[A](a: A)(using Encoder[A], Configuration): Query = QueryOps.withQueryParams[Id, A](query, a)
   end extension
 end QuerySyntax
 object QuerySyntax extends QuerySyntax

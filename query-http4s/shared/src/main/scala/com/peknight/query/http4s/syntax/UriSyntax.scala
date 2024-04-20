@@ -11,7 +11,7 @@ import org.http4s.Uri
 trait UriSyntax:
   extension (uri: Uri)
     def parseQuery[F[_], A](using Monad[F], Decoder[F, A]): F[Either[Error, A]] = UriOps.parseQuery[F, A](uri)
-    def withQueryParams[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[Uri] =
+    def withQuery[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[Uri] =
       UriOps.withQueryParams[F, A](uri, a)
     def parseFragment[F[_], A](using Monad[F], Decoder[F, A]): F[Either[Error, Option[A]]] =
       UriOps.parseFragment[F, A](uri)

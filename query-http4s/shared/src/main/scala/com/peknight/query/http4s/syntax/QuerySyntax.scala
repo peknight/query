@@ -14,7 +14,7 @@ trait QuerySyntax:
 
   extension (query: Query)
     def parse[F[_], A](using Monad[F], Decoder[F, A]): F[Either[Error, A]] = QueryOps.parseQuery[F, A](query)
-    def withQueryParams[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[Query] =
+    def withQuery[F[_], A](a: A)(using Functor[F], Encoder[F, A], Configuration): F[Query] =
       QueryOps.withQueryParams[F, A](query, a)
   end extension
 end QuerySyntax
