@@ -1,6 +1,7 @@
 package com.peknight.query
 
 import cats.data.Chain
+import cats.data.Chain.==:
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -104,11 +105,24 @@ sealed trait Query derives CanEqual:
             case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
           }
         })
-  def pairs(using configuration: Configuration): Chain[(String, Option[String])] = Query.pairs(flatten)
 
-  def toMap(using configuration: Configuration): Map[String, Chain[String]] = Query.toMap(pairs)
+  def pairsEither(using configuration: Configuration): Chain[(String, Either[String, Option[String]])] =
+    Query.pairsEither(flatten)
 
-  def mkString(using Configuration): String = Query.mkString(pairs)
+  def pairsOption(using configuration: Configuration): Chain[(String, Option[String])] =
+    Query.pairsOption(flatten)
+
+  def pairs(using configuration: Configuration): Chain[(String, Option[String])] =
+    Query.pairs(flatten)
+
+  def toMapEither(using configuration: Configuration): Map[String, Either[String, Chain[String]]] =
+    Query.toMapEither(pairsEither)
+
+  def toMapOption(using configuration: Configuration): Map[String, Chain[String]] = Query.toMapOption(pairsEither)
+
+  def toMap(using configuration: Configuration): Map[String, Chain[String]] = Query.toMap(pairsEither)
+
+  def mkString(using Configuration): String = Query.mkString(pairsEither)
 end Query
 object Query:
   case object QueryNull extends Query:
@@ -170,26 +184,36 @@ object Query:
   given StringType[Query] = StringType[Query](Query.fromString, _.asValue)
   given ObjectType[Query] = ObjectType[Query](Query.fromObject, _.asObject)
 
-  def pairs(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
-  : Chain[(String, Option[String])] =
+  def pairsEither(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
+  : Chain[(String, Either[String, Option[String]])] =
     chain.map {
       case (path, value) =>
         val elems = path.value
-        if elems.isEmpty then ("", value)
+        if elems.isEmpty then ("", value.asRight)
         else if elems.length == 1 then
           elems.head match
-            case ObjectKey(keyName) if configuration.defaultKeys.contains(keyName) => ("", value)
-            case ObjectKey(keyName) => (keyName, value)
+            case ObjectKey(keyName) =>
+              val flagValue = value.filter(_ => configuration.flagKeys.contains(keyName))
+              val key = if configuration.defaultKeys.contains(keyName) then "" else keyName
+              flagValue match
+                case Some(v) => (key, v.asLeft)
+                case None => (key, value.asRight)
             case ArrayIndex(index) =>
               configuration.lastArrayOp match
-                case Index => (s"$index", value)
-                case Brackets => ("[]", value)
-                case Empty => ("", value)
+                case Index => (s"$index", value.asRight)
+                case Brackets => ("[]", value.asRight)
+                case Empty => ("", value.asRight)
         else
           val head = elems.head match
             case ObjectKey(keyName) => keyName
             case ArrayIndex(index) => s"$index"
-          val last = elems.last match
+          val lastElem = elems.last
+          val flagValue = value.filter { _ =>
+            lastElem match
+              case ObjectKey(keyName) => configuration.flagKeys.contains(keyName)
+              case ArrayIndex(index) => false
+          }
+          val last = lastElem match
             case ObjectKey(keyName) if configuration.defaultKeys.contains(keyName) => ""
             case ObjectKey(keyName) =>
               configuration.pathOp match
@@ -200,34 +224,71 @@ object Query:
                 case Index => s"[$index]"
                 case Brackets => "[]"
                 case Empty => ""
-          if elems.length == 2 then
-            (s"$head$last", value)
-          else
-            val m = elems.tail.init
-            val key = m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
+          val key =
+            if elems.length == 2 then s"$head$last"
+            else
+              val m = elems.tail.init
+              m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
                 case (sb, ObjectKey(keyName)) =>
                   configuration.pathOp match
                     case PathOp.PathString => sb.append(".").append(keyName)
                     case PathOp.Brackets => sb.append("[").append(keyName).append("]")
                 case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
-              }
-              .append(last).toString
-            (key, value)
+              }.append(last).toString
+          flagValue match
+            case Some(v) => (key, v.asLeft)
+            case None => (key, value.asRight)
     }
 
-  def toMap(chain: Chain[(String, Option[String])]): Map[String, Chain[String]] =
-    chain.filter(_._2.isDefined).foldLeft(ListMap.empty[String, Chain[String]]) { case (acc, (key, valueOption)) =>
-      val nextValues = acc.get(key).map(values => valueOption.fold(values)(value => values :+ value))
-        .getOrElse(valueOption.fold(Chain.empty[String])(Chain.one))
+  def pairsOption(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
+  : Chain[(String, Option[String])] =
+    pairsEither(chain).map(tuple => (tuple._1, tuple._2.fold(Some(_), identity)))
+
+  def pairs(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
+  : Chain[(String, Option[String])] =
+    pairsEither(chain)
+      .collect {
+        case (key, Right(Some(value))) => (key, Some(value))
+        case (key, Left(_)) => (key, None)
+      }
+
+  def toMapEither(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Either[String, Chain[String]]] =
+    chain.foldLeft(ListMap.empty[String, Either[String, Chain[String]]]) { case (acc, (key, valueEither)) =>
+      val nextValues = acc.get(key)
+        .map { valuesEither =>
+          (valuesEither, valueEither) match
+            case (Left(flagValueA), Left(flagValueB)) => Chain(flagValueA, flagValueB).asRight[String]
+            case (Left(flagValue), Right(None)) => flagValue.asLeft[Chain[String]]
+            case (Left(flagValue), Right(Some(value))) => Chain(flagValue, value).asRight[String]
+            case (Right(Chain()), Left(flagValue)) => flagValue.asLeft[Chain[String]]
+            case (Right(chain), Left(flagValue)) => (chain :+ flagValue).asRight[String]
+            case (Right(chain), Right(None)) => chain.asRight[String]
+            case (Right(chain), Right(Some(value))) => (chain :+ value).asRight[String]
+        }
+        .getOrElse { valueEither match
+          case Left(flagValue) => flagValue.asLeft[Chain[String]]
+          case Right(None) => Chain.empty[String].asRight[String]
+          case Right(Some(value)) => Chain.one(value).asRight[String]
+        }
       acc + (key -> nextValues)
     }
 
-  def mkString(chain: Chain[(String, Option[String])]): String =
+  def toMapOption(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Chain[String]] =
+    toMapEither(chain).map(tuple => (tuple._1, tuple._2.fold(Chain.one, identity)))
+
+  def toMap(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Chain[String]] =
+    toMapEither(chain).collect {
+      case (key, Right(chain @ (head ==: tail))) => (key, chain)
+      case (key, Left(_)) => (key, Chain.empty[String])
+    }
+
+  def mkString(chain: Chain[(String, Either[String, Option[String]])]): String =
     chain.collect {
-      case (key, Some(value)) =>
+      case (key, Right(Some(value))) =>
         val keyStr = URLEncoder.encode(key, UTF_8)
         val valueStr = URLEncoder.encode(value, UTF_8)
         if keyStr.isEmpty then valueStr else s"$keyStr=$valueStr"
+      case (key, Left(_)) => URLEncoder.encode(key, UTF_8)
     }.filter(_.nonEmpty).toList.mkString("&")
 
   def parseMap(map: Map[PathToRoot, String]): Either[ParsingFailure, Query] =
