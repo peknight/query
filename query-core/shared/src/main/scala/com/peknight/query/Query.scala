@@ -100,11 +100,13 @@ sealed trait Query derives CanEqual:
           }
         })
       case Query.QueryObject(value) =>
-        Foldable[Vector].fold[Chain[(PathToRoot, Option[String])]](value.toVector.map {
-          case (key, query) => query.flatten.map {
-            case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
-          }
-        })
+        if value.isEmpty then Chain.one(PathToRoot.empty, Some(""))
+        else
+          Foldable[Vector].fold[Chain[(PathToRoot, Option[String])]](value.toVector.map {
+            case (key, query) => query.flatten.map {
+              case (pathToRoot, value) => (ObjectKey(key) +: pathToRoot, value)
+            }
+          })
 
   def pairsEither(using configuration: Configuration): Chain[(String, Either[String, Option[String]])] =
     Query.pairsEither(flatten)
