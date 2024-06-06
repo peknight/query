@@ -1,6 +1,7 @@
 package com.peknight.query
 
 import com.peknight.codec.configuration.given
+import com.peknight.error.Error
 import com.peknight.query.configuration.given
 import com.peknight.query.parser.id.parse
 import com.peknight.query.syntax.id.query.toQueryString
@@ -20,6 +21,8 @@ class QueryParserFlatSpec extends AnyFlatSpec:
       Department("X", List(Employee("A", 20, List(Fruit.Apple, Fruit.Pear)), Employee("B", 25, List(Fruit.Peach)))),
       Department("Y", List(Employee("C", 30, List(Fruit.Apple, Fruit.Peach)), Employee("D", 35, List(Fruit.Pear))))
     ))
-    assert(parse[Company](company.toQueryString).exists(_ == company))
+    val companyQueryString: String = company.toQueryString
+    val result: Either[Error, Company] = parse[Company](companyQueryString)
+    assert(result.exists(_ == company))
   }
 end QueryParserFlatSpec

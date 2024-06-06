@@ -1,6 +1,6 @@
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
-ThisBuild / scalaVersion := "3.3.3"
+ThisBuild / scalaVersion := "3.4.2"
 
 ThisBuild / organization := "com.peknight"
 
@@ -51,9 +51,9 @@ lazy val queryHttp4s = (crossProject(JSPlatform, JVMPlatform) in file("query-htt
     ),
   )
 
-val scalaTestVersion = "3.2.16"
 val catsParseVersion = "0.3.10"
 val http4sVersion = "1.0.0-M34"
+val scalaTestVersion = "3.2.18"
 val pekVersion = "0.1.0-SNAPSHOT"
 val pekCodecVersion = pekVersion
 val pekCommonsVersion = pekVersion

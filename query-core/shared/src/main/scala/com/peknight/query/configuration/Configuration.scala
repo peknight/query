@@ -7,7 +7,7 @@ trait Configuration:
   def flagKeys: List[String]
 end Configuration
 object Configuration:
-  private[this] case class Configuration(
+  private case class Configuration(
     lastArrayOp: ArrayOp,
     pathOp: PathOp,
     defaultKeys: List[String],

@@ -48,45 +48,45 @@ package object parser:
   : F[Either[Error, A]] =
     parse(parseToQueryWithSeq(params))
 
-  private[this] val stringParser: Parser[String] =
+  private val stringParser: Parser[String] =
     Parser.charsWhile(ch => !"&=".contains(ch)).map(URLDecoder.decode(_, UTF_8))
 
-  private[this] val pairParser: Parser[(String, String)] = (stringParser ~ (Parser.char('=') *> stringParser.?).?).map {
+  private val pairParser: Parser[(String, String)] = (stringParser ~ (Parser.char('=') *> stringParser.?).?).map {
     case (value, None) => ("", value)
     case (key, Some(valueOption)) => (key, valueOption.getOrElse(""))
   }
 
-  private[this] val pairsParser: Parser[Map[String, Chain[String]]] = pairParser.repSep(Parser.char('&'))
+  private val pairsParser: Parser[Map[String, Chain[String]]] = pairParser.repSep(Parser.char('&'))
     .map { _.foldLeft[Map[String, Chain[String]]](ListMap.empty[String, Chain[String]]) { case (map, (key, value)) =>
       map + (key -> map.get(key).fold(Chain.one(value))(_.append(value)))
     }}
 
-  private[this] val arrayIndexParser: Parser[ArrayIndex] = nonNegativeIntString.map(str => ArrayIndex(str.toLong))
+  private val arrayIndexParser: Parser[ArrayIndex] = nonNegativeIntString.map(str => ArrayIndex(str.toLong))
 
-  private[this] val objectKeyParser: Parser[ObjectKey] =
+  private val objectKeyParser: Parser[ObjectKey] =
     (Parser.charWhere(ch => !ch.isDigit && !".[]".contains(ch)) ~ Parser.charsWhile0(ch => !".[]".contains(ch)))
       .string.map(ObjectKey.apply)
 
-  private[this] val pathElemParser: Parser[PathElem] = arrayIndexParser | objectKeyParser
+  private val pathElemParser: Parser[PathElem] = arrayIndexParser | objectKeyParser
 
-  private[this] val middlePathElemParser: Parser[PathElem] =
+  private val middlePathElemParser: Parser[PathElem] =
     (Parser.char('.') *> pathElemParser) | pathElemParser.between(Parser.char('['), Parser.char(']')).backtrack
 
-  private[this] object ArrayFlag
+  private object ArrayFlag
 
-  private[this] val arrayFlagParser: Parser[ArrayFlag.type] = Parser.string("[]").as(ArrayFlag)
+  private val arrayFlagParser: Parser[ArrayFlag.type] = Parser.string("[]").as(ArrayFlag)
 
-  private[this] val keyParser: Parser0[(PathToRoot, Option[ArrayFlag.type])] =
+  private val keyParser: Parser0[(PathToRoot, Option[ArrayFlag.type])] =
     ((pathElemParser ~ middlePathElemParser.rep0).? ~ arrayFlagParser.?).map {
       case (None, arrayFlagOption) => (PathToRoot.empty, arrayFlagOption)
       case (Some(head, tail), arrayFlagOption) => (PathToRoot((head :: tail).toVector), arrayFlagOption)
     }
 
-  private[this] def parseToPathMap[F[_]](map: Map[String, F[String]])
-                                        (uncons: F[String] => Option[(String, F[String])])
-                                        (nonEmpty: F[String] => Boolean)
-                                        (zipWithIndex: F[String] => F[(String, Int)])
-                                        (using Foldable[F], Applicative[F])
+  private def parseToPathMap[F[_]](map: Map[String, F[String]])
+                                  (uncons: F[String] => Option[(String, F[String])])
+                                  (nonEmpty: F[String] => Boolean)
+                                  (zipWithIndex: F[String] => F[(String, Int)])
+                                  (using Foldable[F], Applicative[F])
   : Validated[ParsingFailure, Map[PathToRoot, String]] =
     map.toList
       .traverse {
@@ -108,8 +108,8 @@ package object parser:
         }
       }
 
-  private[this] def parse[F[_], A](parseResult: Either[ParsingFailure, Query])
-                                  (using monad: Monad[F], decoder: Decoder[F, A]): F[Either[Error, A]] =
+  private def parse[F[_], A](parseResult: Either[ParsingFailure, Query])
+                            (using monad: Monad[F], decoder: Decoder[F, A]): F[Either[Error, A]] =
     EitherT(parseResult.pure[F])
       .flatMap(query => EitherT(decoder.decodeS(query).asInstanceOf[F[Either[Error, A]]]))
       .value

@@ -9,7 +9,7 @@ import com.peknight.query.parser.{parseWithChain, parseWithSeq}
 import org.http4s.{Request, UrlForm}
 
 object RequestOps:
-  def parseQuery[F[_], A](request: Request[_])(using Monad[F], Decoder[F, A]): F[Either[Error, A]] =
+  def parseQuery[F[_], A](request: Request[?])(using Monad[F], Decoder[F, A]): F[Either[Error, A]] =
     parseWithSeq[F, A](request.multiParams)
 
   def parseUrlForm[F[_], G[_], A](request: Request[F])(using Concurrent[F], Monad[G], Decoder[G, A])
