@@ -7,10 +7,11 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import cats.{Applicative, Foldable, Monoid}
+import com.peknight.codec.number.Number
 import com.peknight.codec.obj.Object
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.PathToRoot
-import com.peknight.codec.sum.{ArrayType, NullType, ObjectType, StringType}
+import com.peknight.codec.sum.*
 import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.Isomorphism
 import com.peknight.query.configuration.ArrayOp.{Brackets, Empty, Index}
@@ -185,6 +186,7 @@ object Query:
   given NullType[Query] = NullType[Query](Query.Null, _.asNull)
   given StringType[Query] = StringType[Query](Query.fromString, _.asValue)
   given ObjectType[Query] = ObjectType[Query](Query.fromObject, _.asObject)
+  given NumberType[Query] = NumberType[Query](number => Query.fromString(number.toString), _.asValue.flatMap(Number.fromString))
 
   def pairsEither(chain: Chain[(PathToRoot, Option[String])])(using configuration: Configuration)
   : Chain[(String, Either[String, Option[String]])] =
