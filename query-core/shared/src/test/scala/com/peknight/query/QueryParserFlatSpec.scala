@@ -1,6 +1,8 @@
 package com.peknight.query
 
 import com.peknight.codec.configuration.given
+import com.peknight.codec.instances.generic.decoder.derivation.given
+import com.peknight.codec.instances.generic.encoder.derivation.given
 import com.peknight.error.Error
 import com.peknight.query.configuration.given
 import com.peknight.query.parser.id.parse
