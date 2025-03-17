@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import cats.{Applicative, Foldable, Monoid}
+import cats.{Applicative, Foldable, Monoid, Show}
 import com.peknight.codec.Decoder
 import com.peknight.codec.number.Number
 import com.peknight.codec.obj.Object
@@ -334,6 +334,6 @@ object Query:
       else if objectMap.isEmpty && arrayMap.isEmpty then
         rootOption.fold(Null)(fromString).asRight
       else
-        RootTypeNotMatch.value(map).asLeft
+        RootTypeNotMatch.value(map)(using Show.fromToString[Map[PathToRoot, String]]).asLeft
     else Null.asRight
 end Query
