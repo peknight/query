@@ -130,7 +130,6 @@ sealed trait Query derives CanEqual:
 end Query
 object Query:
   case object QueryNull extends Query:
-
     given [F[_]: Applicative]: Isomorphism[F, QueryNull.type, Unit] with
       def to(a: QueryNull.type): F[Unit] = ().pure
       def from(b: Unit): F[QueryNull.type] = QueryNull.pure
