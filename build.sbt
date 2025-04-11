@@ -35,7 +35,6 @@ lazy val queryCore = (crossProject(JSPlatform, JVMPlatform) in file("query-core"
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-parse" % catsParseVersion,
       "com.peknight" %%% "codec-core" % pekCodecVersion,
-      "com.peknight" %%% "commons-string" % pekCommonsVersion,
       "org.scalatest" %%% "scalatest" % scalaTestVersion % Test,
     ),
   )
@@ -56,4 +55,3 @@ val http4sVersion = "1.0.0-M34"
 val scalaTestVersion = "3.2.19"
 val pekVersion = "0.1.0-SNAPSHOT"
 val pekCodecVersion = pekVersion
-val pekCommonsVersion = pekVersion
