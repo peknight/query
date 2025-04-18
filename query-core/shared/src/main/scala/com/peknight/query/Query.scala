@@ -1,6 +1,7 @@
 package com.peknight.query
 
 import cats.data.Chain
+import cats.syntax.show.*
 import cats.data.Chain.==:
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -188,6 +189,14 @@ object Query:
   given ObjectType[Query] = ObjectType[Query](Query.fromObject, _.asObject)
   given NumberType[Query] = NumberType[Query](number => Query.fromString(number.toString), _.asValue.flatMap(Number.fromString))
   given BooleanType[Query] = BooleanType[Query](flag => Query.fromString(flag.toString), _.asValue.flatMap(Decoder.toBooleanOption))
+  given Show[Query] with
+    def show(t: Query): String = t match {
+      case QueryNull => "null"
+      case QueryValue(value) => value
+      case QueryArray(value) => value.mkString("[", ",", "]")
+      case QueryObject(value) => value.show
+    }
+  end given
 
   def pairsEither(chain: Chain[(PathToRoot, Option[String])])(using config: Config)
   : Chain[(String, Either[String, Option[String]])] =
