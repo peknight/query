@@ -1,7 +1,7 @@
 package com.peknight.query
 
 import com.peknight.error.Error
-import com.peknight.query.configuration.given
+import com.peknight.query.config.given
 import com.peknight.query.parser.id.parse
 import com.peknight.query.syntax.id.query.toQueryString
 import org.scalatest.flatspec.AnyFlatSpec

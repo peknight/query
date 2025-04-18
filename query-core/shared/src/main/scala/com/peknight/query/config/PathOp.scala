@@ -1,4 +1,4 @@
-package com.peknight.query.configuration
+package com.peknight.query.config
 
 enum PathOp derives CanEqual:
   case PathString, Brackets

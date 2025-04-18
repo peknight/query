@@ -7,7 +7,7 @@ import com.peknight.codec.path.PathToRoot
 import com.peknight.error.Error
 import com.peknight.error.parse.ParsingFailure
 import com.peknight.query.codec.id.{Decoder, Encoder}
-import com.peknight.query.configuration.Configuration
+import com.peknight.query.config.Config
 import com.peknight.query.parser
 import com.peknight.query.parser.id.parseWithChain
 import com.peknight.query.parser.{parseToQuery, parseToQueryWithChain, parseToQueryWithSeq}
@@ -17,19 +17,19 @@ trait QuerySyntax:
     def flatten(using Encoder[A]): Chain[(PathToRoot, Option[String])] =
       Encoder[A].encode(a).flatten
 
-    def pairs(using Encoder[A], Configuration): Chain[(String, Option[String])] =
+    def pairs(using Encoder[A], Config): Chain[(String, Option[String])] =
       Encoder[A].encode(a).pairs
 
-    def toMap(using Encoder[A], Configuration): Map[String, Chain[String]] =
+    def toMap(using Encoder[A], Config): Map[String, Chain[String]] =
       Encoder[A].encode(a).toMap
 
-    def toQueryString(using Encoder[A], Configuration): String =
+    def toQueryString(using Encoder[A], Config): String =
       Encoder[A].encode(a).mkString
   end extension
 
   extension (input: String)
     def parse[A](using Decoder[A]): Either[Error, A] = parser.id.parse[A](input)
-    def withQueryParams[A](a: A)(using Encoder[A], Configuration): Either[ParsingFailure, String] =
+    def withQueryParams[A](a: A)(using Encoder[A], Config): Either[ParsingFailure, String] =
       parseToQuery(input) match
         case Right(query) => (query |+| Encoder[A].encode(a)).mkString.asRight[ParsingFailure]
         case Left(failure) => failure.asLeft[String]
@@ -37,7 +37,7 @@ trait QuerySyntax:
 
   extension (map: Map[String, Chain[String]])
     def parse[A](using Decoder[A]): Either[Error, A] = parseWithChain[A](map)
-    def withQueryParams[A](a: A)(using Encoder[A], Configuration): Either[ParsingFailure, Map[String, Chain[String]]] =
+    def withQueryParams[A](a: A)(using Encoder[A], Config): Either[ParsingFailure, Map[String, Chain[String]]] =
       parseToQueryWithChain(map) match
         case Right(query) => (query |+| Encoder[A].encode(a)).toMap.asRight[ParsingFailure]
         case Left(failure) => failure.asLeft[Map[String, Chain[String]]]
@@ -45,7 +45,7 @@ trait QuerySyntax:
 
   extension (map: Map[String, collection.Seq[String]])
     def parseWithSeq[A](using Decoder[A]): Either[Error, A] = parser.id.parseWithSeq[A](map)
-    def withSeqQueryParams[A](a: A)(using Encoder[A], Configuration): Either[ParsingFailure, Map[String, Seq[String]]] =
+    def withSeqQueryParams[A](a: A)(using Encoder[A], Config): Either[ParsingFailure, Map[String, Seq[String]]] =
       parseToQueryWithSeq(map) match
         case Right(query) => (query |+| Encoder[A].encode(a)).toMap.map((k, v) => (k, v.toList)).asRight[ParsingFailure]
         case Left(failure) => failure.asLeft[Map[String, Seq[String]]]
