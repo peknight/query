@@ -2,15 +2,17 @@ package com.peknight.query.parser
 
 import cats.Id
 import cats.data.Chain
+import com.peknight.codec.Decoder
+import com.peknight.codec.cursor.Cursor
 import com.peknight.error.Error
-import com.peknight.query.codec.id.Decoder
+import com.peknight.query.Query
 
 package object id:
-  def parse[A: Decoder](input: String): Either[Error, A] =
+  def parse[A](input: String)(using Decoder[Id, Cursor[Query], A]): Either[Error, A] =
     com.peknight.query.parser.parse[Id, A](input)
-  def parseWithChain[A: Decoder](params: Map[String, Chain[String]]): Either[Error, A] =
+  def parseWithChain[A](params: Map[String, Chain[String]])(using Decoder[Id, Cursor[Query], A]): Either[Error, A] =
     com.peknight.query.parser.parseWithChain[Id, A](params)
 
-  def parseWithSeq[A: Decoder](params: Map[String, collection.Seq[String]]): Either[Error, A] =
+  def parseWithSeq[A](params: Map[String, collection.Seq[String]])(using Decoder[Id, Cursor[Query], A]): Either[Error, A] =
     com.peknight.query.parser.parseWithSeq[Id, A](params)
 end id

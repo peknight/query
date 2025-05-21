@@ -8,11 +8,12 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import cats.{Applicative, Foldable, Monad}
+import com.peknight.codec.Decoder
+import com.peknight.codec.cursor.Cursor
 import com.peknight.codec.path.PathElem.{ArrayIndex, ObjectKey}
 import com.peknight.codec.path.{PathElem, PathToRoot}
 import com.peknight.error.Error
 import com.peknight.error.parse.ParsingFailure
-import com.peknight.query.codec.Decoder
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets.UTF_8
@@ -39,12 +40,12 @@ package object parser:
   def parseToQueryWithSeq(params: Map[String, collection.Seq[String]]): Either[ParsingFailure, Query] =
     parseToPathMapWithSeq(params).toEither.flatMap(Query.parseMap)
 
-  def parse[F[_], A](input: String)(using Monad[F], Decoder[F, A]): F[Either[Error, A]] = parse(parseToQuery(input))
+  def parse[F[_], A](input: String)(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parse(parseToQuery(input))
 
-  def parseWithChain[F[_], A](params: Map[String, Chain[String]])(using Monad[F], Decoder[F, A]): F[Either[Error, A]] =
+  def parseWithChain[F[_], A](params: Map[String, Chain[String]])(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
     parse(parseToQueryWithChain(params))
 
-  def parseWithSeq[F[_], A](params: Map[String, collection.Seq[String]])(using Monad[F], Decoder[F, A])
+  def parseWithSeq[F[_], A](params: Map[String, collection.Seq[String]])(using Monad[F], Decoder[F, Cursor[Query], A])
   : F[Either[Error, A]] =
     parse(parseToQueryWithSeq(params))
 
@@ -109,7 +110,7 @@ package object parser:
       }
 
   private def parse[F[_], A](parseResult: Either[ParsingFailure, Query])
-                            (using monad: Monad[F], decoder: Decoder[F, A]): F[Either[Error, A]] =
+                            (using monad: Monad[F], decoder: Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
     EitherT(parseResult.pure[F])
       .flatMap(query => EitherT(decoder.decodeS(query).asInstanceOf[F[Either[Error, A]]]))
       .value
