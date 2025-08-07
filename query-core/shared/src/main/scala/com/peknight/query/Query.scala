@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import scala.collection.immutable.ListMap
 
 sealed trait Query derives CanEqual:
-  def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[Query] => X)
+  def fold[X](queryNull: => X, queryValue: String => X, queryArray: Vector[Query] => X, queryObject: Object[String, Query] => X)
   : X =
     this match
       case Query.QueryNull => queryNull
@@ -60,7 +60,7 @@ sealed trait Query derives CanEqual:
     this match
       case Query.QueryArray(value) => Some(value)
       case _ => None
-  def asObject: Option[Object[Query]] =
+  def asObject: Option[Object[String, Query]] =
     this match
       case Query.QueryObject(value) => Some(value)
       case _ => None
@@ -76,7 +76,7 @@ sealed trait Query derives CanEqual:
     this match
       case Query.QueryArray(value) => f(value)
       case _ => this
-  def withObject(f: Object[Query] => Query): Query =
+  def withObject(f: Object[String, Query] => Query): Query =
     this match
       case Query.QueryObject(value) => f(value)
       case _ => this
@@ -88,7 +88,7 @@ sealed trait Query derives CanEqual:
     this match
       case Query.QueryArray(value) => Query.QueryArray(f(value))
       case _ => this
-  def mapObject(f: Object[Query] => Object[Query]): Query =
+  def mapObject(f: Object[String, Query] => Object[String, Query]): Query =
     this match
       case Query.QueryObject(value) => Query.QueryObject(f(value))
       case _ => this
@@ -148,11 +148,11 @@ object Query:
       def to(a: QueryArray): F[Vector[Query]] = a.value.pure
       def from(b: Vector[Query]): F[QueryArray] = QueryArray(b).pure
   end QueryArray
-  case class QueryObject(value: Object[Query]) extends Query
+  case class QueryObject(value: Object[String, Query]) extends Query
   object QueryObject:
-    given [F[_]: Applicative]: Isomorphism[F, QueryObject, Object[Query]] with
-      def to(a: QueryObject): F[Object[Query]] = a.value.pure
-      def from(b: Object[Query]): F[QueryObject] = QueryObject(b).pure
+    given [F[_]: Applicative]: Isomorphism[F, QueryObject, Object[String, Query]] with
+      def to(a: QueryObject): F[Object[String, Query]] = a.value.pure
+      def from(b: Object[String, Query]): F[QueryObject] = QueryObject(b).pure
   end QueryObject
 
   val Null: Query = QueryNull
@@ -161,7 +161,7 @@ object Query:
   def fromFields(fields: Iterable[(String, Query)]): Query = QueryObject(Object.fromIterable(fields))
   def fromValues(values: Iterable[Query]): Query = QueryArray(values.toVector)
   def fromValues(values: Query*): Query = QueryArray(values.toVector)
-  def fromObject(value: Object[Query]): Query = QueryObject(value)
+  def fromObject(value: Object[String, Query]): Query = QueryObject(value)
   def fromString(value: String): Query = QueryValue(value)
 
   given Monoid[Query] with
