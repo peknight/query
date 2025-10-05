@@ -1,5 +1,5 @@
 package com.peknight.query
 
 package object config:
-  given Config = Config.default
+  given QueryConfig = QueryConfig.default
 end config
