@@ -4,5 +4,5 @@ import cats.data.NonEmptyList
 import com.peknight.codec.path.PathToRoot
 
 trait Config[K]:
-  def apply: PathToRoot => NonEmptyList[K]
+  def toKey(pathToRoot: PathToRoot): NonEmptyList[K]
 end Config

@@ -1,11 +1,11 @@
 package com.peknight.query
 
 import cats.data.Chain
-import cats.syntax.show.*
 import cats.data.Chain.==:
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.show.*
 import cats.syntax.traverse.*
 import cats.{Applicative, Foldable, Monoid, Show}
 import com.peknight.codec.Decoder
@@ -16,8 +16,7 @@ import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.*
 import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.Isomorphism
-import com.peknight.query.config.ArrayOp.{Brackets, Empty, Index}
-import com.peknight.query.config.{QueryConfig, PathOp}
+import com.peknight.query.config.QueryConfig
 import com.peknight.query.error.RootTypeNotMatch
 
 import java.net.URLEncoder
@@ -202,56 +201,24 @@ object Query:
   : Chain[(String, Either[String, Option[String]])] =
     chain.map {
       case (path, value) =>
-        val elems = path.value
-        if elems.isEmpty then ("", value.asRight)
-        else if elems.length == 1 then
-          elems.head match
-            case ObjectKey(keyName) =>
-              val flagValue = value.filter(_ => config.flagKeys.contains(keyName))
-              val key = if config.defaultKeys.contains(keyName) then "" else keyName
-              flagValue match
-                case Some(v) => (key, v.asLeft)
-                case None => (key, value.asRight)
-            case ArrayIndex(index) =>
-              config.lastArrayOp match
-                case Index => (s"$index", value.asRight)
-                case Brackets => ("[]", value.asRight)
-                case Empty => ("", value.asRight)
-        else
-          val head = elems.head match
-            case ObjectKey(keyName) => keyName
-            case ArrayIndex(index) => s"$index"
-          val lastElem = elems.last
-          val flagValue = value.filter { _ =>
-            lastElem match
-              case ObjectKey(keyName) => config.flagKeys.contains(keyName)
-              case ArrayIndex(index) => false
-          }
-          val last = lastElem match
-            case ObjectKey(keyName) if config.defaultKeys.contains(keyName) => ""
-            case ObjectKey(keyName) =>
-              config.pathOp match
-                case PathOp.PathString => s".$keyName"
-                case PathOp.Brackets => s"[$keyName]"
-            case ArrayIndex(index) =>
-              config.lastArrayOp match
-                case Index => s"[$index]"
-                case Brackets => "[]"
-                case Empty => ""
-          val key =
-            if elems.length == 2 then s"$head$last"
-            else
-              val m = elems.tail.init
-              m.foldLeft(new StringBuilder(m.size * 5).append(head)) {
-                case (sb, ObjectKey(keyName)) =>
-                  config.pathOp match
-                    case PathOp.PathString => sb.append(".").append(keyName)
-                    case PathOp.Brackets => sb.append("[").append(keyName).append("]")
-                case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
-              }.append(last).toString
-          flagValue match
-            case Some(v) => (key, v.asLeft)
-            case None => (key, value.asRight)
+        val key = config.toKey(path).head
+        val show =
+          val elems = path.value
+          if elems.isEmpty then value.asRight
+          else if elems.length == 1 then
+            elems.head match
+              case ObjectKey(keyName) =>
+                value.filter(_ => config.flagKeys.contains(keyName)) match
+                  case Some(v) => v.asLeft
+                  case None => value.asRight
+              case ArrayIndex(index) => value.asRight
+          else
+            value.filter { _ =>
+              elems.last match
+                case ObjectKey(keyName) => config.flagKeys.contains(keyName)
+                case ArrayIndex(index) => false
+            }.fold(value.asRight)(_.asLeft)
+        (key, show)
     }
 
   def pairsOption(chain: Chain[(PathToRoot, Option[String])])(using config: QueryConfig)
