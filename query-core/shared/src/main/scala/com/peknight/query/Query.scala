@@ -201,23 +201,27 @@ object Query:
   : Chain[(String, Either[String, Option[String]])] =
     chain.map {
       case (path, value) =>
-        val key = config.toKey(path).head
+        val key = config.toKeys(path).head
         val show =
           val elems = path.value
           if elems.isEmpty then value.asRight
           else if elems.length == 1 then
             elems.head match
               case ObjectKey(keyName) =>
+                // flagKey的场景中，没有值以None返回，有值以Left返回
+                // 非flagKey的场景中，以Option返回
                 value.filter(_ => config.flagKeys.contains(keyName)) match
                   case Some(v) => v.asLeft
                   case None => value.asRight
               case ArrayIndex(index) => value.asRight
-          else
+          else {
+            // 同理
             value.filter { _ =>
               elems.last match
                 case ObjectKey(keyName) => config.flagKeys.contains(keyName)
                 case ArrayIndex(index) => false
             }.fold(value.asRight)(_.asLeft)
+          }
         (key, show)
     }
 

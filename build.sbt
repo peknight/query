@@ -17,6 +17,7 @@ lazy val queryCore = (crossProject(JVMPlatform, JSPlatform) in file("query-core"
   .settings(crossDependencies(
     peknight.codec,
     typelevel.catsParse,
+    typelevel.spire,
   ))
   .settings(crossTestDependencies(scalaTest))
 
