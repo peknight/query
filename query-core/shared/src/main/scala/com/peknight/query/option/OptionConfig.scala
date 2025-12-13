@@ -5,16 +5,16 @@ import com.peknight.codec.path.PathElem.ObjectKey
 import com.peknight.codec.path.PathToRoot
 import com.peknight.query.config.{ArrayOp, Config, PathOp}
 import com.peknight.query.option.ArgumentStyle.SpaceSeparated
-import com.peknight.query.option.OptionKey.{LongOption, NonStandardOption}
+import com.peknight.query.option.OptionKey.{BSDOption, LongOption, NonStandardOption, ShortOption}
 import spire.math.Interval
 
 trait OptionConfig extends Config[OptionKey]:
-  def keyMapper: PathToRoot => List[OptionKey]
+  def transformKey: PathToRoot => List[OptionKey]
   def nonStandardOption: Boolean
   def argumentStyle: ArgumentStyle
   def argumentLength: Interval[Int]
   def toKeys(pathToRoot: PathToRoot): NonEmptyList[OptionKey] =
-    NonEmptyList.fromList(keyMapper(pathToRoot)).getOrElse {
+    NonEmptyList.fromList(transformKey(pathToRoot)).getOrElse {
       val key = toKey(pathToRoot)
       val argLen = pathToRoot.value.lastOption
         .map {
@@ -22,15 +22,20 @@ trait OptionConfig extends Config[OptionKey]:
           case _ => argumentLength
         }
         .getOrElse(argumentLength)
-      val optionKey =
-        if nonStandardOption then NonStandardOption(key, argumentStyle, argLen)
-        else LongOption(key, argumentStyle, argLen)
+      val optionKey = {
+        if nonStandardOption then
+          if key.length == 1 then BSDOption(key.head, argumentStyle, argLen)
+          else NonStandardOption(key, argumentStyle, argLen)
+        else
+          if key.length == 1 then ShortOption(key.head, argumentStyle, argLen)
+          else LongOption(key, argumentStyle, argLen)
+      }
       NonEmptyList.one(optionKey)
     }
 end OptionConfig
 object OptionConfig:
   private case class OptionConfig(
-    keyMapper: PathToRoot => List[OptionKey],
+    transformKey: PathToRoot => List[OptionKey],
     nonStandardOption: Boolean,
     argumentStyle: ArgumentStyle,
     argumentLength: Interval[Int],

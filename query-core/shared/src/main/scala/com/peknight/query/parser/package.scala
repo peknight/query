@@ -26,7 +26,8 @@ package object parser:
     if input.isEmpty then Map.empty[String, Chain[String]].asRight[ParsingFailure]
     else pairsParser.parseAll(input).left.map(ParsingFailure.apply)
 
-  def parseToMap(options: List[String])(shortOptionMapper: Char => String): Either[ParsingFailure, Map[String, Chain[String]]] =
+  def parseToMap(options: List[String])(transformShortOption: Char => String = _.toString)
+  : Either[ParsingFailure, Map[String, Chain[String]]] =
     options.foldLeft((Map.empty[String, Chain[String]], none[String]).asRight[ParsingFailure])((either, input) => either
       .flatMap { (accMap, keyOption) =>
         if input.startsWith("--") then
@@ -41,7 +42,7 @@ package object parser:
         else if input.startsWith("-") then
           (Parser.string("-") *> optionKeyValueParser).parseAll(input)
             .map { (shortOptionKeys, valueOption) =>
-              val keys = if shortOptionKeys.isEmpty then List("") else shortOptionKeys.map(shortOptionMapper)
+              val keys = if shortOptionKeys.isEmpty then List("") else shortOptionKeys.map(transformShortOption)
               val key = keys.last
               val nextMap = keyOption.filter(!_.equals(key))
                 .fold(keys.init)(keys.init.prepended)
@@ -76,8 +77,8 @@ package object parser:
   def parseToQuery(input: String): Either[ParsingFailure, Query] =
     parseToMap(input).flatMap(map => parseToPathMapWithChain(map).toEither).flatMap(Query.parseMap)
 
-  def parseToQuery(options: List[String])(shortOptionMapper: Char => String): Either[ParsingFailure, Query] =
-    parseToMap(options)(shortOptionMapper).flatMap(map => parseToPathMapWithChain(map).toEither).flatMap(Query.parseMap)
+  def parseToQuery(options: List[String])(transformShortOption: Char => String = _.toString): Either[ParsingFailure, Query] =
+    parseToMap(options)(transformShortOption).flatMap(map => parseToPathMapWithChain(map).toEither).flatMap(Query.parseMap)
 
   def parseToQueryWithChain(params: Map[String, Chain[String]]): Either[ParsingFailure, Query] =
     parseToPathMapWithChain(params).toEither.flatMap(Query.parseMap)
@@ -87,9 +88,9 @@ package object parser:
 
   def parse[F[_], A](input: String)(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parse(parseToQuery(input))
 
-  def parse[F[_], A](options: List[String])(shortOptionMapper: Char => String)
+  def parse[F[_], A](options: List[String])(transformShortOption: Char => String = _.toString)
                     (using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
-    parse(parseToQuery(options)(shortOptionMapper))
+    parse(parseToQuery(options)(transformShortOption))
 
   def parseWithChain[F[_], A](params: Map[String, Chain[String]])(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
     parse(parseToQueryWithChain(params))
