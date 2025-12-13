@@ -11,7 +11,8 @@ import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.{Decoder, Encoder}
 import com.peknight.error.Error
 import com.peknight.error.parse.ParsingFailure
-import com.peknight.query.config.QueryConfig
+import com.peknight.query.config.Config
+import com.peknight.query.option.OptionKey
 import com.peknight.query.parser.{parseToQuery, parseToQueryWithChain, parseToQueryWithSeq}
 import com.peknight.query.{Query, parser}
 
@@ -20,19 +21,22 @@ trait QuerySyntax:
     def flatten[F[_]](using Functor[F], Encoder[F, Query, A]): F[Chain[(PathToRoot, Option[String])]] =
       Encoder[F, Query, A].encode(a).map(_.flatten)
 
-    def pairs[F[_]](using Functor[F], Encoder[F, Query, A], QueryConfig): F[Chain[(String, Option[String])]] =
-      Encoder[F, Query, A].encode(a).map(_.pairs)
+    def pairs[F[_], K](using Functor[F], Encoder[F, Query, A], Config[K]): F[Chain[(K, Option[String])]] =
+      Encoder[F, Query, A].encode(a).map(_.pairs[K])
 
-    def toMap[F[_]](using Functor[F], Encoder[F, Query, A], QueryConfig): F[Map[String, Chain[String]]] =
-      Encoder[F, Query, A].encode(a).map(_.toMap)
+    def toMap[F[_], K](using Functor[F], Encoder[F, Query, A], Config[K]): F[Map[K, Chain[String]]] =
+      Encoder[F, Query, A].encode(a).map(_.toMap[K])
 
-    def toQueryString[F[_]](using Functor[F], Encoder[F, Query, A], QueryConfig): F[String] =
+    def toQueryString[F[_]](using Functor[F], Encoder[F, Query, A], Config[String]): F[String] =
       Encoder[F, Query, A].encode(a).map(_.mkString)
+
+    def toOptions[F[_]](using Functor[F], Encoder[F, Query, A], Config[OptionKey]): F[List[String]] =
+      Encoder[F, Query, A].encode(a).map(_.mkOptions)
   end extension
 
   extension (input: String)
     def parse[F[_], A](using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parser.parse[F, A](input)
-    def withQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], QueryConfig)
+    def withQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], Config[String])
     : F[Either[ParsingFailure, String]] =
       parseToQuery(input) match
         case Right(query) => Encoder[F, Query, A].encode(a).map(query |+| _).map(_.mkString.asRight[ParsingFailure])
@@ -41,7 +45,7 @@ trait QuerySyntax:
 
   extension (map: Map[String, Chain[String]])
     def parse[F[_], A](using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parser.parseWithChain[F, A](map)
-    def withQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], QueryConfig)
+    def withQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], Config[String])
     : F[Either[ParsingFailure, Map[String, Chain[String]]]] =
       parseToQueryWithChain(map) match
         case Right(query) => Encoder[F, Query, A].encode(a).map(query |+| _).map(_.toMap.asRight[ParsingFailure])
@@ -49,7 +53,7 @@ trait QuerySyntax:
   end extension
   extension (map: Map[String, collection.Seq[String]])
     def parseWithSeq[F[_], A](using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parser.parseWithSeq[F, A](map)
-    def withSeqQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], QueryConfig)
+    def withSeqQueryParams[F[_], A](a: A)(using Applicative[F], Encoder[F, Query, A], Config[String])
     : F[Either[ParsingFailure, Map[String, Seq[String]]]] =
       parseToQueryWithSeq(map) match
         case Right(query) =>

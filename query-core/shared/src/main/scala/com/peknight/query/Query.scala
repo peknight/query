@@ -16,8 +16,10 @@ import com.peknight.codec.path.PathToRoot
 import com.peknight.codec.sum.*
 import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.Isomorphism
-import com.peknight.query.config.QueryConfig
+import com.peknight.query.config.Config
 import com.peknight.query.error.RootTypeNotMatch
+import com.peknight.query.option.OptionKey
+import spire.math.Interval
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets.UTF_8
@@ -110,23 +112,25 @@ sealed trait Query derives CanEqual:
             }
           })
 
-  def pairsEither(using config: QueryConfig): Chain[(String, Either[String, Option[String]])] =
-    Query.pairsEither(flatten)
+  def pairsEither[K](using config: Config[K]): Chain[(K, Either[String, Option[String]])] =
+    Query.pairsEither[K](flatten)
 
-  def pairsOption(using config: QueryConfig): Chain[(String, Option[String])] =
-    Query.pairsOption(flatten)
+  def pairsOption[K](using config: Config[K]): Chain[(K, Option[String])] =
+    Query.pairsOption[K](flatten)
 
-  def pairs(using config: QueryConfig): Chain[(String, Option[String])] =
-    Query.pairs(flatten)
+  def pairs[K](using config: Config[K]): Chain[(K, Option[String])] =
+    Query.pairs[K](flatten)
 
-  def toMapEither(using config: QueryConfig): Map[String, Either[String, Chain[String]]] =
-    Query.toMapEither(pairsEither)
+  def toMapEither[K](using config: Config[K]): Map[K, Either[String, Chain[String]]] =
+    Query.toMapEither[K](pairsEither)
 
-  def toMapOption(using config: QueryConfig): Map[String, Chain[String]] = Query.toMapOption(pairsEither)
+  def toMapOption[K](using config: Config[K]): Map[K, Chain[String]] = Query.toMapOption[K](pairsEither)
 
-  def toMap(using config: QueryConfig): Map[String, Chain[String]] = Query.toMap(pairsEither)
+  def toMap[K](using config: Config[K]): Map[K, Chain[String]] = Query.toMap[K](pairsEither)
 
-  def mkString(using QueryConfig): String = Query.mkString(pairsEither)
+  def mkString(using Config[String]): String = Query.mkString(pairsEither)
+
+  def mkOptions(using Config[OptionKey]): List[String] = Query.mkOptions(toMapEither)
 end Query
 object Query:
   case object QueryNull extends Query:
@@ -197,8 +201,8 @@ object Query:
     }
   end given
 
-  def pairsEither(chain: Chain[(PathToRoot, Option[String])])(using config: QueryConfig)
-  : Chain[(String, Either[String, Option[String]])] =
+  def pairsEither[K](chain: Chain[(PathToRoot, Option[String])])(using config: Config[K])
+  : Chain[(K, Either[String, Option[String]])] =
     chain.map {
       case (path, value) =>
         val key = config.toKeys(path).head
@@ -225,20 +229,20 @@ object Query:
         (key, show)
     }
 
-  def pairsOption(chain: Chain[(PathToRoot, Option[String])])(using config: QueryConfig)
-  : Chain[(String, Option[String])] =
-    pairsEither(chain).map(tuple => (tuple._1, tuple._2.fold(Some(_), identity)))
+  def pairsOption[K](chain: Chain[(PathToRoot, Option[String])])(using config: Config[K])
+  : Chain[(K, Option[String])] =
+    pairsEither[K](chain).map(tuple => (tuple._1, tuple._2.fold(Some(_), identity)))
 
-  def pairs(chain: Chain[(PathToRoot, Option[String])])(using config: QueryConfig)
-  : Chain[(String, Option[String])] =
-    pairsEither(chain)
+  def pairs[K](chain: Chain[(PathToRoot, Option[String])])(using config: Config[K])
+  : Chain[(K, Option[String])] =
+    pairsEither[K](chain)
       .collect {
         case (key, Right(Some(value))) => (key, Some(value))
         case (key, Left(_)) => (key, None)
       }
 
-  def toMapEither(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Either[String, Chain[String]]] =
-    chain.foldLeft(ListMap.empty[String, Either[String, Chain[String]]]) { case (acc, (key, valueEither)) =>
+  def toMapEither[K](chain: Chain[(K, Either[String, Option[String]])]): Map[K, Either[String, Chain[String]]] =
+    chain.foldLeft(ListMap.empty[K, Either[String, Chain[String]]]) { case (acc, (key, valueEither)) =>
       val nextValues = acc.get(key)
         .map { valuesEither =>
           (valuesEither, valueEither) match
@@ -258,11 +262,11 @@ object Query:
       acc + (key -> nextValues)
     }
 
-  def toMapOption(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Chain[String]] =
-    toMapEither(chain).map(tuple => (tuple._1, tuple._2.fold(Chain.one, identity)))
+  def toMapOption[K](chain: Chain[(K, Either[String, Option[String]])]): Map[K, Chain[String]] =
+    toMapEither[K](chain).map(tuple => (tuple._1, tuple._2.fold(Chain.one, identity)))
 
-  def toMap(chain: Chain[(String, Either[String, Option[String]])]): Map[String, Chain[String]] =
-    toMapEither(chain).collect {
+  def toMap[K](chain: Chain[(K, Either[String, Option[String]])]): Map[K, Chain[String]] =
+    toMapEither[K](chain).collect {
       case (key, Right(chain @ (head ==: tail))) => (key, chain)
       case (key, Left(_)) => (key, Chain.empty[String])
     }
@@ -275,6 +279,20 @@ object Query:
         if keyStr.isEmpty then valueStr else s"$keyStr=$valueStr"
       case (key, Left(_)) => URLEncoder.encode(key, UTF_8)
     }.filter(_.nonEmpty).toList.mkString("&")
+
+  def mkOptions(mapEither: Map[OptionKey, Either[String, Chain[String]]]): List[String] =
+    mapEither.filterNot(_._2.exists(_.isEmpty))
+      .groupBy((key, either) => (key.keyType, key.combinable && either.isLeft))
+      .toList.flatMap {
+        case ((keyType, false), map) => map.toList.flatMap { (key, either) =>
+          val k = s"${keyType.prefix.getOrElse("")}${key.key}"
+          val chain = either.fold(Chain.one, identity)
+          if key.argumentLength.intersect(Interval.above(0)).isEmpty || either.isLeft then List(k)
+          else if key.argumentLength.contains(chain.length.toInt) then k :: chain.toList
+          else chain.toList.flatMap(value => List(k, value))
+        }
+        case ((keyType, true), map) => List(s"${keyType.prefix.getOrElse("")}${map.keySet.map(_.key).mkString}")
+      }
 
   def parseMap(map: Map[PathToRoot, String]): Either[ParsingFailure, Query] =
     if map.nonEmpty then
