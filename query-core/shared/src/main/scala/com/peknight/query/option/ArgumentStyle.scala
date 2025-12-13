@@ -2,7 +2,7 @@ package com.peknight.query.option
 
 import cats.Eq
 
-enum ArgumentStyle:
+enum ArgumentStyle derives CanEqual:
   case EqualsSeparated, SpaceSeparated, NoArgument
 end ArgumentStyle
 object ArgumentStyle:

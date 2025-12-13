@@ -18,7 +18,7 @@ import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.Isomorphism
 import com.peknight.query.config.Config
 import com.peknight.query.error.RootTypeNotMatch
-import com.peknight.query.option.OptionKey
+import com.peknight.query.option.{ArgumentStyle, OptionKey}
 import spire.math.Interval
 
 import java.net.URLEncoder
@@ -282,16 +282,19 @@ object Query:
 
   def mkOptions(mapEither: Map[OptionKey, Either[String, Chain[String]]]): List[String] =
     mapEither.filterNot(_._2.exists(_.isEmpty))
-      .groupBy((key, either) => (key.keyType, key.combinable && either.isLeft))
+      .groupBy((key, either) => (key.keyType, key.combinable && either.isLeft, key.argumentStyle))
       .toList.flatMap {
-        case ((keyType, false), map) => map.toList.flatMap { (key, either) =>
+        case ((keyType, false, argumentStyle), map) => map.toList.flatMap { (key, either) =>
           val k = s"${keyType.prefix.getOrElse("")}${key.key}"
           val chain = either.fold(Chain.one, identity)
+          val length = chain.length.toInt
           if key.argumentLength.intersect(Interval.above(0)).isEmpty || either.isLeft then List(k)
-          else if key.argumentLength.contains(chain.length.toInt) then k :: chain.toList
-          else chain.toList.flatMap(value => List(k, value))
+          else if length > 1 && key.argumentLength.contains(length) then k :: chain.toList
+          else chain.toList.flatMap(value =>
+            if argumentStyle == ArgumentStyle.EqualsSeparated then List(s"$k=$value") else List(k, value)
+          )
         }
-        case ((keyType, true), map) => List(s"${keyType.prefix.getOrElse("")}${map.keySet.map(_.key).mkString}")
+        case ((keyType, true, _), map) => List(s"${keyType.prefix.getOrElse("")}${map.keySet.map(_.key).mkString}")
       }
 
   def parseMap(map: Map[PathToRoot, String]): Either[ParsingFailure, Query] =
