@@ -4,6 +4,7 @@ import cats.data.Chain
 import cats.data.Chain.==:
 import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import cats.syntax.show.*
 import cats.syntax.traverse.*
@@ -291,7 +292,7 @@ object Query:
           if key.argumentLength.intersect(Interval.above(0)).isEmpty || either.isLeft then List(k)
           else if length > 1 && key.argumentLength.contains(length) then k :: chain.toList
           else chain.toList.flatMap(value =>
-            if argumentStyle == ArgumentStyle.EqualsSeparated then List(s"$k=$value") else List(k, value)
+            if argumentStyle === ArgumentStyle.EqualsSeparated then List(s"$k=$value") else List(k, value)
           )
         }
         case ((keyType, true, _), map) => List(s"${keyType.prefix.getOrElse("")}${map.keySet.map(_.key).mkString}")
