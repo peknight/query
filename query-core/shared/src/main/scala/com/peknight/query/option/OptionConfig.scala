@@ -46,7 +46,7 @@ object OptionConfig:
   ) extends com.peknight.query.option.OptionConfig
 
   def apply(
-             keyMapper: PathToRoot => List[OptionKey] = _ => Nil,
+             transformKey: PathToRoot => List[OptionKey] = _ => Nil,
              nonStandardOption: Boolean = false,
              argumentStyle: ArgumentStyle = SpaceSeparated,
              argumentLength: Interval[Int] = Interval.closed(0, 1),
@@ -55,7 +55,7 @@ object OptionConfig:
              defaultKeys: List[String] = Nil,
              flagKeys: List[String] = Nil
            ): com.peknight.query.option.OptionConfig =
-    OptionConfig(keyMapper, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
+    OptionConfig(transformKey, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
       flagKeys)
 
   val default: com.peknight.query.option.OptionConfig = apply()
