@@ -2,8 +2,9 @@ package com.peknight.query
 
 import com.peknight.error.Error
 import com.peknight.query.config.given
+import com.peknight.query.option.given
 import com.peknight.query.parser.id.parse
-import com.peknight.query.syntax.id.query.toQueryString
+import com.peknight.query.syntax.id.query.{toOptions, toQueryString}
 import org.scalatest.flatspec.AnyFlatSpec
 
 class QueryParserFlatSpec extends AnyFlatSpec:
@@ -13,6 +14,7 @@ class QueryParserFlatSpec extends AnyFlatSpec:
     val tuple: (String, Int, Boolean) = Tuple.fromProductTyped(iceCream)
     assert(parse[IceCream](iceCream.toQueryString).exists(_ == iceCream))
     assert(parse[(String, Int, Boolean)](tuple.toQueryString).exists(_ == tuple))
+    assert(parse[IceCream](iceCream.toOptions)(_.toString).exists(_ == iceCream))
   }
 
   "Query Parser" should "succeed with company" in {
