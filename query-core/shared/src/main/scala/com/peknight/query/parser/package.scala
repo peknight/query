@@ -6,6 +6,7 @@ import cats.parse.{Parser, Parser0}
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import cats.{Applicative, Foldable, Monad}
 import com.peknight.codec.Decoder
@@ -25,6 +26,47 @@ package object parser:
     if input.isEmpty then Map.empty[String, Chain[String]].asRight[ParsingFailure]
     else pairsParser.parseAll(input).left.map(ParsingFailure.apply)
 
+  def parseToMap(options: List[String])(shortOptionMapper: Char => String): Either[ParsingFailure, Map[String, Chain[String]]] =
+    options.foldLeft((Map.empty[String, Chain[String]], none[String]).asRight[ParsingFailure])((either, input) => either
+      .flatMap { (accMap, keyOption) =>
+        if input.startsWith("--") then
+          (Parser.string("--") *> optionKeyValueParser).parseAll(input)
+            .map { (key, valueOption) =>
+              val nextMap = keyOption.filter(!_.equals(key))
+                .map(previousKey => putFlagKeysToMap(accMap, previousKey))
+                .getOrElse(accMap)
+              (putKeyValueOptionToMap(nextMap, key, valueOption), key.some)
+            }
+            .left.map(ParsingFailure.apply)
+        else if input.startsWith("-") then
+          (Parser.string("-") *> optionKeyValueParser).parseAll(input)
+            .map { (shortOptionKeys, valueOption) =>
+              val keys = if shortOptionKeys.isEmpty then List("") else shortOptionKeys.map(shortOptionMapper)
+              val key = keys.last
+              val nextMap = keyOption.filter(!_.equals(key))
+                .fold(keys.init)(keys.init.prepended)
+                .foldLeft(accMap)(putFlagKeysToMap)
+              (putKeyValueOptionToMap(nextMap, key, valueOption), key.some)
+            }
+            .left.map(ParsingFailure.apply)
+        else
+          keyOption.map(key => (putKeyValueToMap(accMap, key, input), key.some).asRight[ParsingFailure]).getOrElse {
+            optionKeyValueParser.parseAll(input)
+              .map((key, valueOption) => (putKeyValueOptionToMap(accMap, key, valueOption), key.some))
+              .left.map(ParsingFailure.apply)
+          }
+      }).map(_._1)
+
+  private def putKeyValueToMap(map: Map[String, Chain[String]], key: String, value: String): Map[String, Chain[String]] =
+    map + (key -> map.get(key).fold(Chain.one(value))(_.append(value)))
+
+  private def putKeyValueOptionToMap(map: Map[String, Chain[String]], key: String, valueOption: Option[String])
+  : Map[String, Chain[String]] =
+    valueOption.map(value => putKeyValueToMap(map, key, value)).getOrElse(map)
+
+  private def putFlagKeysToMap(map: Map[String, Chain[String]], key: String): Map[String, Chain[String]] =
+    map.get(key).filter(_.nonEmpty).fold(map + (key -> Chain.one("true")))(_ => map)
+
   def parseToPathMapWithChain(map: Map[String, Chain[String]]): Validated[ParsingFailure, Map[PathToRoot, String]] =
     parseToPathMap(map)(_.uncons)(_.nonEmpty)(_.zipWithIndex)
 
@@ -34,6 +76,9 @@ package object parser:
   def parseToQuery(input: String): Either[ParsingFailure, Query] =
     parseToMap(input).flatMap(map => parseToPathMapWithChain(map).toEither).flatMap(Query.parseMap)
 
+  def parseToQuery(options: List[String])(shortOptionMapper: Char => String): Either[ParsingFailure, Query] =
+    parseToMap(options)(shortOptionMapper).flatMap(map => parseToPathMapWithChain(map).toEither).flatMap(Query.parseMap)
+
   def parseToQueryWithChain(params: Map[String, Chain[String]]): Either[ParsingFailure, Query] =
     parseToPathMapWithChain(params).toEither.flatMap(Query.parseMap)
 
@@ -41,6 +86,10 @@ package object parser:
     parseToPathMapWithSeq(params).toEither.flatMap(Query.parseMap)
 
   def parse[F[_], A](input: String)(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] = parse(parseToQuery(input))
+
+  def parse[F[_], A](options: List[String])(shortOptionMapper: Char => String)
+                    (using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
+    parse(parseToQuery(options)(shortOptionMapper))
 
   def parseWithChain[F[_], A](params: Map[String, Chain[String]])(using Monad[F], Decoder[F, Cursor[Query], A]): F[Either[Error, A]] =
     parse(parseToQueryWithChain(params))
@@ -57,9 +106,12 @@ package object parser:
     case (key, Some(valueOption)) => (key, valueOption.getOrElse(""))
   }
 
+  private val optionKeyValueParser: Parser[(String, Option[String])] = (stringParser ~ (Parser.char('=') *> stringParser.?).?)
+    .map((key, valueOption) => (key, valueOption.flatten))
+
   private val pairsParser: Parser[Map[String, Chain[String]]] = pairParser.repSep(Parser.char('&'))
     .map { _.foldLeft[Map[String, Chain[String]]](ListMap.empty[String, Chain[String]]) { case (map, (key, value)) =>
-      map + (key -> map.get(key).fold(Chain.one(value))(_.append(value)))
+      putKeyValueToMap(map, key, value)
     }}
 
   private val arrayIndexParser: Parser[ArrayIndex] = nonNegativeIntString.map(str => ArrayIndex(str.toLong))
