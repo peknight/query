@@ -2,7 +2,7 @@ package com.peknight.query.option
 
 import cats.data.NonEmptyList
 import com.peknight.codec.path.PathElem.ObjectKey
-import com.peknight.codec.path.PathToRoot
+import com.peknight.codec.path.{PathElem, PathToRoot}
 import com.peknight.query.config.{ArrayOp, Config, PathOp}
 import com.peknight.query.option.ArgumentStyle.SpaceSeparated
 import com.peknight.query.option.OptionKey.{BSDOption, LongOption, NonStandardOption, ShortOption}
@@ -55,6 +55,25 @@ object OptionConfig:
              defaultKeys: List[String] = Nil,
              flagKeys: List[String] = Nil
            ): com.peknight.query.option.OptionConfig =
+    OptionConfig(transformKey, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
+      flagKeys)
+
+  def transformObjectKey(
+                          nonStandardOption: Boolean = false,
+                          argumentStyle: ArgumentStyle = SpaceSeparated,
+                          argumentLength: Interval[Int] = Interval.closed(0, 1),
+                          lastArrayOp: ArrayOp = ArrayOp.Empty,
+                          pathOp: PathOp = PathOp.PathString,
+                          defaultKeys: List[String] = Nil,
+                          flagKeys: List[String] = Nil
+                        )(f: PartialFunction[String, List[OptionKey]]): com.peknight.query.option.OptionConfig =
+    val transformKey: PathToRoot => List[OptionKey] = pathToRoot =>
+      val lastKeyName = pathToRoot.value
+        .collect { case objectKey: PathElem.ObjectKey => objectKey.keyName }
+        .lastOption
+      lastKeyName match
+        case Some(lastKey) if f.isDefinedAt(lastKey) => f(lastKey)
+        case _ => Nil
     OptionConfig(transformKey, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
       flagKeys)
 
