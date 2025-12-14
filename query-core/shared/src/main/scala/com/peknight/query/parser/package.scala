@@ -102,12 +102,12 @@ package object parser:
   private val stringParser: Parser[String] =
     Parser.charsWhile(ch => !"&=".contains(ch)).map(URLDecoder.decode(_, UTF_8))
 
-  private val pairParser: Parser[(String, String)] = (stringParser ~ (Parser.char('=') *> stringParser.?).?).map {
+  val pairParser: Parser[(String, String)] = (stringParser ~ (Parser.char('=') *> stringParser.?).?).map {
     case (value, None) => ("", value)
     case (key, Some(valueOption)) => (key, valueOption.getOrElse(""))
   }
 
-  private val optionKeyValueParser: Parser[(String, Option[String])] = (stringParser ~ (Parser.char('=') *> stringParser.?).?)
+  val optionKeyValueParser: Parser[(String, Option[String])] = (stringParser ~ (Parser.char('=') *> stringParser.?).?)
     .map((key, valueOption) => (key, valueOption.flatten))
 
   private val pairsParser: Parser[Map[String, Chain[String]]] = pairParser.repSep(Parser.char('&'))
