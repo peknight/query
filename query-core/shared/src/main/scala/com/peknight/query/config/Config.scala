@@ -35,6 +35,7 @@ trait Config[K]:
           pathOp match
             case PathOp.PathString => s".$keyName"
             case PathOp.Brackets => s"[$keyName]"
+            case PathOp.Underscore => s"_$keyName"
         case ArrayIndex(index) =>
           lastArrayOp match
             case Index => s"[$index]"
@@ -48,6 +49,7 @@ trait Config[K]:
             pathOp match
               case PathOp.PathString => sb.append(".").append(keyName)
               case PathOp.Brackets => sb.append("[").append(keyName).append("]")
+              case PathOp.Underscore => sb.append("_").append(keyName)
           case (sb, ArrayIndex(index)) => sb.append("[").append(index.toString).append("]")
         }.append(last).toString
 end Config
