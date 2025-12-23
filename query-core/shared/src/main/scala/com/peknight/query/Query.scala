@@ -19,7 +19,7 @@ import com.peknight.error.parse.ParsingFailure
 import com.peknight.generic.migration.Isomorphism
 import com.peknight.query.config.Config
 import com.peknight.query.error.RootTypeNotMatch
-import com.peknight.query.option.{ArgumentStyle, OptionKey}
+import com.peknight.query.option.{ArgumentStyle, OptionKey, OptionKeyType}
 import spire.math.Interval
 
 import java.net.URLEncoder
@@ -285,6 +285,7 @@ object Query:
     mapEither.filterNot(_._2.exists(_.isEmpty))
       .groupBy((key, either) => (key.keyType, key.combinable && either.isLeft, key.argumentStyle))
       .toList.flatMap {
+        case ((OptionKeyType.None, _, _), _) => List.empty[String]
         case ((keyType, false, argumentStyle), map) => map.toList.flatMap { (key, either) =>
           val k = s"${keyType.prefix.getOrElse("")}${key.key}"
           val chain = either.fold(Chain.one, identity)

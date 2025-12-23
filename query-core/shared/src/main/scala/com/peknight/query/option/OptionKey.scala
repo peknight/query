@@ -41,6 +41,13 @@ object OptionKey:
     def argumentLength: Interval[Int] = argLen & Interval.atOrAbove(0)
     def combinable: Boolean = canBeCombined && argumentLength === Interval.point(0)
   end BSDOption
+  case object None extends OptionKey:
+    def key: String = ""
+    def keyType: OptionKeyType = OptionKeyType.None
+    def argumentStyle: ArgumentStyle = ArgumentStyle.NoArgument
+    def argumentLength: Interval[Int] = Interval.point(0)
+    def combinable: Boolean = false
+  end None
   given showOptionKey: Show[OptionKey] =
     Show.fromToString[OptionKey]
 end OptionKey

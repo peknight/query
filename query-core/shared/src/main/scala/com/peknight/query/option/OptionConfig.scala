@@ -5,7 +5,7 @@ import com.peknight.codec.path.PathElem.ObjectKey
 import com.peknight.codec.path.{PathElem, PathToRoot}
 import com.peknight.query.config.{ArrayOp, Config, PathOp}
 import com.peknight.query.option.ArgumentStyle.SpaceSeparated
-import com.peknight.query.option.OptionKey.{BSDOption, LongOption, NonStandardOption, ShortOption}
+import com.peknight.query.option.OptionKey.{BSDOption, LongOption, NonStandardOption, None, ShortOption}
 import spire.math.Interval
 
 trait OptionConfig extends Config[OptionKey]:
@@ -16,21 +16,22 @@ trait OptionConfig extends Config[OptionKey]:
   def toKeys(pathToRoot: PathToRoot): NonEmptyList[OptionKey] =
     NonEmptyList.fromList(transformKey(pathToRoot)).getOrElse {
       val key = toKey(pathToRoot)
-      val argLen = pathToRoot.value.lastOption
-        .map {
-          case ObjectKey(keyName) if flagKeys.contains(keyName) => Interval.point(0)
-          case _ => argumentLength
+      if key.isEmpty then NonEmptyList.one(None) else
+        val argLen = pathToRoot.value.lastOption
+          .map {
+            case ObjectKey(keyName) if flagKeys.contains(keyName) => Interval.point(0)
+            case _ => argumentLength
+          }
+          .getOrElse(argumentLength)
+        val optionKey = {
+          if nonStandardOption then
+            if key.length == 1 then BSDOption(key.head, argumentStyle, argLen)
+            else NonStandardOption(key, argumentStyle, argLen)
+          else
+            if key.length == 1 then ShortOption(key.head, argumentStyle, argLen)
+            else LongOption(key, argumentStyle, argLen)
         }
-        .getOrElse(argumentLength)
-      val optionKey = {
-        if nonStandardOption then
-          if key.length == 1 then BSDOption(key.head, argumentStyle, argLen)
-          else NonStandardOption(key, argumentStyle, argLen)
-        else
-          if key.length == 1 then ShortOption(key.head, argumentStyle, argLen)
-          else LongOption(key, argumentStyle, argLen)
-      }
-      NonEmptyList.one(optionKey)
+        NonEmptyList.one(optionKey)
     }
 end OptionConfig
 object OptionConfig:
