@@ -9,7 +9,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class QueryParserFlatSpec extends AnyFlatSpec:
 
-  "Query Parser" should "succeed with ice cream" in {
+  "Query Parser" should "pass for ice cream" in {
     val iceCream = IceCream("r&u=a+", 7, true)
     val tuple: (String, Int, Boolean) = Tuple.fromProductTyped(iceCream)
     assert(parse[IceCream](iceCream.toQueryString).exists(_ == iceCream))
@@ -17,7 +17,7 @@ class QueryParserFlatSpec extends AnyFlatSpec:
     assert(parse[IceCream](iceCream.toOptions)(_.toString).exists(_ == iceCream))
   }
 
-  "Query Parser" should "succeed with company" in {
+  "Query Parser" should "pass for company" in {
     val company = Company("Pek", List(
       Department("X", List(Employee("A", 20, List(Fruit.Apple, Fruit.Pear)), Employee("B", 25, List(Fruit.Peach)))),
       Department("Y", List(Employee("C", 30, List(Fruit.Apple, Fruit.Peach)), Employee("D", 35, List(Fruit.Pear))))
