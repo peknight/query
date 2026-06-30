@@ -8,7 +8,7 @@ pipeline {
         }
         stage('Build, Test & Publish') {
             steps {
-                sh 'sbt --server "clean; testFull; publishLocal; publish; shutdown"'
+                sh 'sbt -J-Xmx2G --server "clean; testFull; publishLocal; publish; shutdown"'
             }
         }
     }
