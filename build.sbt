@@ -3,8 +3,9 @@ import com.peknight.build.sbt.*
 
 commonSettings
 
-lazy val query = (project in file("."))
+lazy val query = rootProject
   .settings(name := "query")
+  .settings(publish / skip := true)
   .aggregate(queryCore.projectRefs *)
   .aggregate(queryHttp4s.projectRefs *)
 
