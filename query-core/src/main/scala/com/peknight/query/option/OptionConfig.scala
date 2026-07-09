@@ -11,6 +11,7 @@ import spire.math.Interval
 trait OptionConfig extends Config[OptionKey]:
   def transformKey: PathToRoot => List[OptionKey]
   def nonStandardOption: Boolean
+  def bsdOption: Boolean
   def argumentStyle: ArgumentStyle
   def argumentLength: Interval[Int]
   def toKeys(pathToRoot: PathToRoot): NonEmptyList[OptionKey] =
@@ -25,7 +26,7 @@ trait OptionConfig extends Config[OptionKey]:
           .getOrElse(argumentLength)
         val optionKey = {
           if nonStandardOption then
-            if key.length == 1 then BSDOption(key.head, argumentStyle, argLen)
+            if bsdOption && key.length == 1 then BSDOption(key.head, argumentStyle, argLen)
             else NonStandardOption(key, argumentStyle, argLen)
           else
             if key.length == 1 then ShortOption(key.head, argumentStyle, argLen)
@@ -38,6 +39,7 @@ object OptionConfig:
   private case class OptionConfig(
     transformKey: PathToRoot => List[OptionKey],
     nonStandardOption: Boolean,
+    bsdOption: Boolean,
     argumentStyle: ArgumentStyle,
     argumentLength: Interval[Int],
     lastArrayOp: ArrayOp,
@@ -49,6 +51,7 @@ object OptionConfig:
   def apply(
              transformKey: PathToRoot => List[OptionKey] = _ => Nil,
              nonStandardOption: Boolean = false,
+             bsdOption: Boolean = false,
              argumentStyle: ArgumentStyle = SpaceSeparated,
              argumentLength: Interval[Int] = Interval.closed(0, 1),
              lastArrayOp: ArrayOp = ArrayOp.Empty,
@@ -56,11 +59,12 @@ object OptionConfig:
              defaultKeys: List[String] = Nil,
              flagKeys: List[String] = Nil
            ): com.peknight.query.option.OptionConfig =
-    OptionConfig(transformKey, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
-      flagKeys)
+    OptionConfig(transformKey, nonStandardOption, bsdOption, argumentStyle, argumentLength, lastArrayOp, pathOp,
+      defaultKeys, flagKeys)
 
   def transformObjectKey(
                           nonStandardOption: Boolean = false,
+                          bsdOption: Boolean = false,
                           argumentStyle: ArgumentStyle = SpaceSeparated,
                           argumentLength: Interval[Int] = Interval.closed(0, 1),
                           lastArrayOp: ArrayOp = ArrayOp.Empty,
@@ -75,8 +79,8 @@ object OptionConfig:
       lastKeyName match
         case Some(lastKey) if f.isDefinedAt(lastKey) => f(lastKey)
         case _ => Nil
-    OptionConfig(transformKey, nonStandardOption, argumentStyle, argumentLength, lastArrayOp, pathOp, defaultKeys,
-      flagKeys)
+    OptionConfig(transformKey, nonStandardOption, bsdOption, argumentStyle, argumentLength, lastArrayOp, pathOp,
+      defaultKeys, flagKeys)
 
   val default: com.peknight.query.option.OptionConfig = apply()
 end OptionConfig
